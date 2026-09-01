@@ -327,18 +327,20 @@
   tbody tr:hover { background: var(--surface-alt); }
   tbody tr:hover td { background: var(--surface-alt); }
 
-  /* Actions column stays put while the rest of the sheet scrolls horizontally.
-     Its right edge is a deliberately darker divider — a visual cue that this column
-     is pinned and everything past it is what's actually scrolling. */
+  /* Actions column stays put while the rest of the sheet scrolls horizontally. It carries
+     a permanent tint (not just on hover) plus a heavy border and a drop shadow, so it
+     reads as a distinct pinned panel at any scroll position — not just a thin line that
+     gets lost once other columns are sliding past it. */
   .actions-col {
     position: sticky;
     left: 0;
     z-index: 2;
-    background: var(--surface);
+    background: var(--surface-alt) !important;
     border-right: 3px solid var(--ink-muted) !important;
+    box-shadow: 6px 0 10px -6px rgba(0, 0, 0, 0.35);
   }
-  thead th.actions-col { z-index: 3; background: var(--surface-alt); }
-  tbody tr:hover td.actions-col { background: var(--surface-alt); }
+  thead th.actions-col { z-index: 3; background: var(--surface-sunken) !important; }
+  tbody tr:hover td.actions-col { background: var(--surface-sunken) !important; }
 
   tbody input, tbody select {
     width: 100%;
