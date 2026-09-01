@@ -1,0 +1,1089 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Job Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f5f7f8;
+    --surface: #ffffff;
+    --surface-alt: #eef1f4;
+    --surface-sunken: #e7ebee;
+    --ink: #1b2430;
+    --ink-muted: #5b6572;
+    --ink-faint: #8992a0;
+    --border: #dce1e7;
+    --border-strong: #c3cad2;
+    --accent: #2b6e63;
+    --accent-ink: #ffffff;
+    --accent-soft: #dceee9;
+    --accent-soft-ink: #1e5148;
+    --warn: #93691f;
+    --warn-soft: #f5ead2;
+    --danger: #a3453f;
+    --danger-soft: #f6dfdd;
+    --success: #2f7a52;
+    --focus: #2b6e63;
+    --shadow: 0 12px 32px -12px rgba(27, 36, 48, 0.28);
+    --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.08);
+    --radius: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c;
+      --surface: #1a2029;
+      --surface-alt: #212834;
+      --surface-sunken: #0e1218;
+      --ink: #e9edf2;
+      --ink-muted: #a2acb9;
+      --ink-faint: #6b7484;
+      --border: #2c3441;
+      --border-strong: #3a4453;
+      --accent: #5aab9b;
+      --accent-ink: #0d1a17;
+      --accent-soft: #1e3833;
+      --accent-soft-ink: #8fd0c0;
+      --warn: #d3ac5e;
+      --warn-soft: #3a3120;
+      --danger: #e18c85;
+      --danger-soft: #3c2422;
+      --success: #6fbb8e;
+      --focus: #5aab9b;
+      --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #12161c;
+    --surface: #1a2029;
+    --surface-alt: #212834;
+    --surface-sunken: #0e1218;
+    --ink: #e9edf2;
+    --ink-muted: #a2acb9;
+    --ink-faint: #6b7484;
+    --border: #2c3441;
+    --border-strong: #3a4453;
+    --accent: #5aab9b;
+    --accent-ink: #0d1a17;
+    --accent-soft: #1e3833;
+    --accent-soft-ink: #8fd0c0;
+    --warn: #d3ac5e;
+    --warn-soft: #3a3120;
+    --danger: #e18c85;
+    --danger-soft: #3c2422;
+    --success: #6fbb8e;
+    --focus: #5aab9b;
+    --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .topbar h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .topbar .sub {
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    min-width: 76px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .stat .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .stat .l {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 0;
+  }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    border-bottom: none;
+    background: var(--surface-alt);
+    color: var(--ink-muted);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.86rem;
+    padding: 9px 18px 8px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tab .count {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 6px;
+    color: var(--ink-faint);
+  }
+
+  .tab[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--ink);
+    border-bottom: 1px solid var(--surface);
+  }
+
+  .tab[aria-selected="true"] .count {
+    color: var(--ink-muted);
+  }
+
+  .tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---------- Table shell ---------- */
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 0 8px 8px 8px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .sheet-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 980px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-alt);
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+    font-weight: 600;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-strong);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    z-index: 1;
+  }
+
+  thead th:last-child { border-right: none; }
+
+  tbody td {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tbody td:last-child { border-right: none; }
+
+  tbody tr:hover { background: var(--surface-alt); }
+  tbody tr:hover td { background: var(--surface-alt); }
+
+  tbody input, tbody select {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 8px 10px;
+    border-radius: 4px;
+  }
+
+  tbody input[type="number"] { font-family: "IBM Plex Mono", monospace; }
+  tbody input[type="date"] { font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; }
+
+  tbody input:hover, tbody select:hover { background: var(--surface-sunken); }
+  tbody input:focus, tbody select:focus {
+    outline: none;
+    border-color: var(--focus);
+    background: var(--surface);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 25%, transparent);
+  }
+
+  .col-position input, .col-company input { font-weight: 600; }
+
+  .cell-num { text-align: right; }
+  .cell-num input { text-align: right; }
+
+  .chk-cell { text-align: center; }
+  .chk-cell input[type="checkbox"] {
+    width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill-remote { background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .pill-hybrid { background: var(--warn-soft); color: var(--warn); }
+  .pill-onsite { background: var(--surface-sunken); color: var(--ink-muted); }
+
+  select.loc-select {
+    -webkit-appearance: none; appearance: none;
+    cursor: pointer;
+  }
+
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+
+  .icon-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-muted);
+    border-radius: 6px;
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    flex: none;
+  }
+  .icon-btn:hover { background: var(--surface-alt); color: var(--ink); border-color: var(--border-strong); }
+  .icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+  .move-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-muted);
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .move-btn:hover { background: var(--accent-soft); color: var(--accent-soft-ink); border-color: var(--accent); }
+  .move-btn.back:hover { background: var(--surface-alt); color: var(--ink); border-color: var(--border-strong); }
+
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+  }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 8px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: var(--surface-alt); border-color: var(--border-strong); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .empty {
+    padding: 56px 24px;
+    text-align: center;
+    color: var(--ink-muted);
+  }
+  .empty h2 { color: var(--ink); font-size: 1.05rem; margin: 0 0 6px; }
+  .empty p { margin: 0 0 16px; font-size: 0.88rem; }
+
+  /* ---------- Drawer ---------- */
+  .scrim {
+    position: fixed; inset: 0;
+    background: rgba(15, 19, 24, 0.42);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 40;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(560px, 100vw);
+    background: var(--surface);
+    border-left: 1px solid var(--border-strong);
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(.32,.72,.35,1);
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drawer, .scrim { transition: none; }
+  }
+
+  .drawer-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex: none;
+  }
+
+  .drawer-head .titles input {
+    font-size: 1.15rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font-family: inherit;
+    width: 100%;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+  .drawer-head .titles input.company {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+  }
+  .drawer-head .titles input:hover { background: var(--surface-sunken); }
+  .drawer-head .titles input:focus {
+    outline: none; border-color: var(--focus); background: var(--surface-alt);
+  }
+
+  .drawer-body {
+    padding: 18px 22px 40px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .section {
+    margin-bottom: 26px;
+  }
+
+  .section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--ink-muted);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.span-2 { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  .field input, .field select, .field textarea {
+    font: inherit;
+    font-size: 0.86rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 7px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .field textarea { resize: vertical; min-height: 64px; font-family: inherit; line-height: 1.45; }
+  .field.checkline { flex-direction: row; align-items: center; gap: 8px; }
+  .field.checkline input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .field.checkline label { font-size: 0.86rem; color: var(--ink); }
+
+  .card-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--surface-alt);
+    position: relative;
+  }
+
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
+
+  .card .rm {
+    position: absolute; top: 8px; right: 8px;
+  }
+
+  .entry-card { display: flex; flex-direction: column; gap: 8px; }
+  .entry-head { display: flex; align-items: center; gap: 10px; }
+  .entry-head input[type="date"] {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.82rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .entry-card textarea {
+    font: inherit; font-size: 0.85rem; line-height: 1.45;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    border-radius: 6px; padding: 8px; min-height: 56px; resize: vertical;
+  }
+  .entry-card textarea:focus, .entry-head input:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+
+  .ghost-btn {
+    border: 1px dashed var(--border-strong);
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+  }
+  .ghost-btn:hover { background: var(--surface-alt); color: var(--accent); border-color: var(--accent); }
+
+  .drawer-foot {
+    border-top: 1px solid var(--border);
+    padding: 12px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: none;
+    background: var(--surface);
+  }
+
+  .stage-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .stage-jobs { background: var(--surface-sunken); color: var(--ink-muted); }
+  .stage-applied { background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .stage-rejected { background: var(--danger-soft); color: var(--danger); }
+
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  ::selection { background: var(--accent-soft); }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div>
+      <h1>Job Tracker</h1>
+      <div class="sub">Your search, one sheet at a time. Everything saves automatically on this device.</div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Job tracker stages">
+    <button class="tab" role="tab" data-stage="jobs" aria-selected="true">Jobs <span class="count" id="count-jobs">0</span></button>
+    <button class="tab" role="tab" data-stage="applied" aria-selected="false">Applied <span class="count" id="count-applied">0</span></button>
+    <button class="tab" role="tab" data-stage="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
+  </nav>
+
+  <div class="sheet">
+    <div class="sheet-scroll">
+      <table id="table">
+        <thead><tr id="thead-row"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="add-row">
+      <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="titles">
+      <input type="text" id="d-position" class="position" placeholder="Job position" aria-label="Job position">
+      <input type="text" id="d-company" class="company" placeholder="Company name" aria-label="Company name">
+    </div>
+    <button class="icon-btn" id="d-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body">
+
+    <div class="section">
+      <p class="section-title">Role details</p>
+      <div class="field-grid">
+        <div class="field"><label for="d-date">Date added</label><input type="date" id="d-date"></div>
+        <div class="field"><label for="d-location">Location</label>
+          <select id="d-location"><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option><option value="On-site">On-site</option></select>
+        </div>
+        <div class="field"><label for="d-reviewPercent">Glassdoor overall rating (%)</label><input type="number" id="d-reviewPercent" min="0" max="100" step="1"></div>
+        <div class="field"><label for="d-reviewCount">Glassdoor # of reviews</label><input type="number" id="d-reviewCount" min="0" step="1"></div>
+        <div class="field"><label for="d-postedSalary">Posted salary</label><input type="text" id="d-postedSalary" placeholder="e.g. $110k – $130k"></div>
+        <div class="field"><label for="d-salaryAsk">Salary ask</label><input type="text" id="d-salaryAsk" placeholder="e.g. $125k"></div>
+        <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
+        <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
+        <div class="field span-2"><label for="d-companyUrl">Company URL</label><input type="text" id="d-companyUrl" placeholder="https://"></div>
+        <div class="field span-2"><label for="d-values">Company values</label><textarea id="d-values" placeholder="Culture, mission, values that stood out"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Application</p>
+      <div class="field-grid">
+        <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
+        <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
+        <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
+        <div class="field span-2"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Contacts</p>
+      <div class="card-list" id="contacts-list"></div>
+      <button class="ghost-btn" id="add-contact" type="button" style="margin-top:8px;">+ Add contact</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Interviews</p>
+      <div class="card-list" id="interviews-list"></div>
+      <button class="ghost-btn" id="add-interview" type="button" style="margin-top:8px;">+ Add interview</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Follow-ups</p>
+      <div class="card-list" id="followups-list"></div>
+      <button class="ghost-btn" id="add-followup" type="button" style="margin-top:8px;">+ Add follow-up</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">General notes</p>
+      <textarea id="d-notes" style="width:100%; min-height:100px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Anything else worth remembering about this one"></textarea>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <span class="stage-badge" id="d-stage-badge">Jobs</span>
+    <button class="icon-btn danger" id="d-delete" type="button" aria-label="Delete record" title="Delete record">🗑</button>
+  </div>
+</aside>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "jobTrackerData.v1";
+  var state = { activeStage: "jobs", activeId: null, jobs: [] };
+
+  function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.jobs)) return parsed.jobs;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return [];
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobs: state.jobs }));
+    } catch (e) { /* storage unavailable; edits stay in-memory for this session */ }
+  }
+
+  function blankJob() {
+    return {
+      id: uid(), stage: "jobs",
+      date: "", position: "", company: "",
+      reviewPercent: "", reviewCount: "", postedSalary: "", salaryAsk: "",
+      location: "Remote", pto: "", medical: "",
+      dateApplied: "", whereApplied: "", interviewing: false,
+      dateRejected: "",
+      companyUrl: "", values: "", notes: "",
+      contacts: [], interviews: [], followups: []
+    };
+  }
+
+  state.jobs = load();
+
+  // ---------- Column definitions per stage ----------
+  var COLS_JOBS = [
+    { key: "date", label: "Date", type: "date", w: "112px" },
+    { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
+    { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" },
+    { key: "reviewPercent", label: "Glassdoor %", type: "number", num: true, w: "104px" },
+    { key: "reviewCount", label: "Glassdoor #", type: "number", num: true, w: "100px" },
+    { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" },
+    { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" },
+    { key: "location", label: "Location", type: "location", w: "118px" },
+    { key: "pto", label: "PTO", type: "text", w: "120px" },
+    { key: "medical", label: "Medical", type: "text", w: "140px" }
+  ];
+  var COLS_APPLIED = COLS_JOBS.concat([
+    { key: "dateApplied", label: "Date applied", type: "date", w: "116px" },
+    { key: "whereApplied", label: "Where applied", type: "text", w: "140px" },
+    { key: "interviewing", label: "Interviewing", type: "checkbox", w: "96px" }
+  ]);
+  var COLS_REJECTED = COLS_APPLIED.concat([
+    { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" }
+  ]);
+  var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, rejected: COLS_REJECTED };
+  var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", rejected: "Rejected" };
+
+  // ---------- Tabs ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () {
+      state.activeStage = t.getAttribute("data-stage");
+      tabs.forEach(function (o) { o.setAttribute("aria-selected", o === t ? "true" : "false"); });
+      renderTable();
+    });
+  });
+
+  document.getElementById("add-btn").addEventListener("click", function () {
+    var job = blankJob();
+    job.stage = state.activeStage;
+    if (state.activeStage === "applied" && !job.dateApplied) job.dateApplied = todayStr();
+    if (state.activeStage === "rejected" && !job.dateRejected) job.dateRejected = todayStr();
+    state.jobs.push(job);
+    save();
+    renderTable();
+    openDrawer(job.id);
+  });
+
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function fmt(v) { return v === undefined || v === null ? "" : v; }
+
+  // ---------- Table rendering ----------
+  function renderStats() {
+    var jobs = state.jobs.filter(function (j) { return j.stage === "jobs"; }).length;
+    var applied = state.jobs.filter(function (j) { return j.stage === "applied"; }).length;
+    var interviewing = state.jobs.filter(function (j) { return j.interviewing; }).length;
+    var rejected = state.jobs.filter(function (j) { return j.stage === "rejected"; }).length;
+    document.getElementById("stats").innerHTML = [
+      ["Tracking", jobs + applied + rejected],
+      ["Applied", applied],
+      ["Interviewing", interviewing],
+      ["Rejected", rejected]
+    ].map(function (s) {
+      return '<div class="stat"><span class="n">' + s[1] + '</span><span class="l">' + s[0] + '</span></div>';
+    }).join("");
+    document.getElementById("count-jobs").textContent = jobs;
+    document.getElementById("count-applied").textContent = applied;
+    document.getElementById("count-rejected").textContent = rejected;
+  }
+
+  function cellHtml(job, col) {
+    var v = fmt(job[col.key]);
+    if (col.type === "checkbox") {
+      return '<div class="chk-cell"><input type="checkbox" data-id="' + job.id + '" data-field="' + col.key + '" ' + (job[col.key] ? "checked" : "") + '></div>';
+    }
+    if (col.type === "location") {
+      var opts = ["Remote", "Hybrid", "On-site"].map(function (o) {
+        return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + o + "</option>";
+      }).join("");
+      return '<select class="loc-select" data-id="' + job.id + '" data-field="location">' + opts + "</select>";
+    }
+    var type = col.type === "number" ? "number" : (col.type === "date" ? "date" : "text");
+    var esc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key + '"' +
+      (col.num ? ' inputmode="decimal"' : "") + '>';
+  }
+
+  function renderTable() {
+    renderStats();
+    var stage = state.activeStage;
+    var cols = STAGE_COLS[stage];
+    var rows = state.jobs.filter(function (j) { return j.stage === stage; });
+
+    var thead = document.getElementById("thead-row");
+    thead.innerHTML = cols.map(function (c) {
+      return '<th style="width:' + c.w + '">' + c.label + "</th>";
+    }).join("") + '<th style="width:150px">Actions</th>';
+
+    var tbody = document.getElementById("tbody");
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="' + (cols.length + 1) + '"><div class="empty">' +
+        "<h2>No records in " + STAGE_LABEL[stage] + " yet</h2>" +
+        "<p>" + (stage === "jobs" ? "Add a role you're considering to start tracking it." : "Move a record here from another tab, or add one directly.") + "</p>" +
+        '<button class="btn btn-primary" type="button" onclick="document.getElementById(\'add-btn\').click()">+ Add job</button>' +
+        "</div></td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (job) {
+      var cells = cols.map(function (c) {
+        var cls = [c.cls, c.num ? "cell-num" : ""].filter(Boolean).join(" ");
+        return '<td class="' + cls + '">' + cellHtml(job, c) + "</td>";
+      }).join("");
+
+      var moveBtns = "";
+      if (stage === "jobs") {
+        moveBtns = '<button class="move-btn" data-action="to-applied" data-id="' + job.id + '">Applied →</button>';
+      } else if (stage === "applied") {
+        moveBtns = '<button class="move-btn back" data-action="to-jobs" data-id="' + job.id + '">← Jobs</button>' +
+          '<button class="move-btn" data-action="to-rejected" data-id="' + job.id + '">Rejected →</button>';
+      } else if (stage === "rejected") {
+        moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>';
+      }
+
+      return '<tr>' + cells +
+        '<td><div class="row-actions">' +
+        '<button class="icon-btn" data-action="view" data-id="' + job.id + '" title="Open record" aria-label="Open record">⤢</button>' +
+        moveBtns +
+        '<button class="icon-btn danger" data-action="delete" data-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
+        "</div></td></tr>";
+    }).join("");
+  }
+
+  function findJob(id) {
+    for (var i = 0; i < state.jobs.length; i++) if (state.jobs[i].id === id) return state.jobs[i];
+    return null;
+  }
+
+  // Delegated input/change handling for inline editing (avoids full re-render per keystroke)
+  document.getElementById("tbody").addEventListener("input", function (e) {
+    var el = e.target;
+    var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
+    if (!id || !field) return;
+    var job = findJob(id);
+    if (!job) return;
+    if (el.type === "checkbox") job[field] = el.checked;
+    else job[field] = el.value;
+    save();
+  });
+
+  document.getElementById("tbody").addEventListener("change", function (e) {
+    var el = e.target;
+    if (el.tagName === "SELECT") {
+      var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
+      var job = findJob(id);
+      if (job) { job[field] = el.value; save(); }
+    }
+    renderStats();
+  });
+
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var job = findJob(id);
+    if (!job) return;
+    var action = btn.getAttribute("data-action");
+    if (action === "view") { openDrawer(id); return; }
+    if (action === "delete") {
+      if (confirm("Delete this record? This can't be undone.")) {
+        state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
+        save(); renderTable();
+      }
+      return;
+    }
+    if (action === "to-applied") {
+      job.stage = "applied";
+      if (!job.dateApplied) job.dateApplied = todayStr();
+    } else if (action === "to-rejected") {
+      job.stage = "rejected";
+      if (!job.dateRejected) job.dateRejected = todayStr();
+    } else if (action === "to-jobs") {
+      job.stage = "jobs";
+    }
+    save();
+    renderTable();
+  });
+
+  // ---------- Drawer ----------
+  var drawer = document.getElementById("drawer");
+  var scrim = document.getElementById("scrim");
+
+  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
+    "pto", "medical", "companyUrl", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
+
+  function openDrawer(id) {
+    var job = findJob(id);
+    if (!job) return;
+    state.activeId = id;
+
+    document.getElementById("d-position").value = job.position || "";
+    document.getElementById("d-company").value = job.company || "";
+    SIMPLE_FIELDS.forEach(function (f) {
+      var el = document.getElementById("d-" + f);
+      if (el) el.value = job[f] || "";
+    });
+    document.getElementById("d-interviewing").checked = !!job.interviewing;
+
+    var badge = document.getElementById("d-stage-badge");
+    badge.textContent = STAGE_LABEL[job.stage];
+    badge.className = "stage-badge stage-" + job.stage;
+
+    renderContacts(job);
+    renderEntries(job, "interviews", "interviews-list");
+    renderEntries(job, "followups", "followups-list");
+
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+    scrim.classList.add("open");
+    document.getElementById("d-position").focus();
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+    scrim.classList.remove("open");
+    state.activeId = null;
+    renderTable();
+  }
+
+  document.getElementById("d-close").addEventListener("click", closeDrawer);
+  scrim.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+  });
+
+  document.getElementById("d-delete").addEventListener("click", function () {
+    if (!state.activeId) return;
+    if (confirm("Delete this record? This can't be undone.")) {
+      var id = state.activeId;
+      state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
+      save();
+      closeDrawer();
+    }
+  });
+
+  document.getElementById("drawer-body").addEventListener("input", function (e) {
+    var el = e.target;
+    if (!state.activeId) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    if (el.id === "d-position") { job.position = el.value; return; }
+    if (el.id === "d-company") { job.company = el.value; return; }
+    if (el.id === "d-interviewing") { job.interviewing = el.checked; save(); return; }
+    var m = el.id.match(/^d-(.+)$/);
+    if (m && SIMPLE_FIELDS.indexOf(m[1]) !== -1) {
+      job[m[1]] = el.value;
+      save();
+    }
+  });
+  document.getElementById("drawer-body").addEventListener("blur", function (e) {
+    if (e.target.id === "d-position" || e.target.id === "d-company") save();
+  }, true);
+  document.getElementById("drawer-body").addEventListener("change", function (e) {
+    if (e.target.id === "d-location" || e.target.id === "d-interviewing" || e.target.tagName === "INPUT") save();
+  });
+
+  // ---------- Contacts ----------
+  function renderContacts(job) {
+    var list = document.getElementById("contacts-list");
+    if (!job.contacts.length) {
+      list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
+    } else {
+      list.innerHTML = job.contacts.map(function (c) {
+        return '<div class="card" data-cid="' + c.id + '">' +
+          '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
+          '<div class="card-grid">' +
+          field2("Name", "text", c.name, c.id, "name") +
+          field2("Phone", "tel", c.phone, c.id, "phone") +
+          field2("Email", "email", c.email, c.id, "email") +
+          field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
+          "</div></div>";
+      }).join("");
+    }
+  }
+
+  function field2(label, type, val, cid, field) {
+    var esc = String(val || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    return '<div class="field"><label>' + label + '</label><input type="' + type + '" value="' + esc +
+      '" data-cid="' + cid + '" data-cfield="' + field + '"></div>';
+  }
+
+  document.getElementById("add-contact").addEventListener("click", function () {
+    var job = findJob(state.activeId);
+    if (!job) return;
+    job.contacts.push({ id: uid(), name: "", phone: "", email: "", linkedin: "" });
+    save();
+    renderContacts(job);
+  });
+
+  document.getElementById("contacts-list").addEventListener("input", function (e) {
+    var el = e.target;
+    var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
+    if (!cid || !field) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var c = job.contacts.find(function (x) { return x.id === cid; });
+    if (c) { c[field] = el.value; save(); }
+  });
+
+  document.getElementById("contacts-list").addEventListener("click", function (e) {
+    var btn = e.target.closest('button[data-action="rm-contact"]');
+    if (!btn) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    job.contacts = job.contacts.filter(function (c) { return c.id !== btn.getAttribute("data-cid"); });
+    save();
+    renderContacts(job);
+  });
+
+  // ---------- Interviews & follow-ups (shared logic) ----------
+  function renderEntries(job, key, listId) {
+    var list = document.getElementById(listId);
+    var entries = job[key];
+    if (!entries.length) {
+      list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">None logged yet.</p>';
+      return;
+    }
+    list.innerHTML = entries.map(function (e, idx) {
+      var notesEsc = String(e.notes || "").replace(/</g, "&lt;");
+      return '<div class="card entry-card" data-eid="' + e.id + '">' +
+        '<button class="icon-btn rm" data-action="rm-entry" data-key="' + key + '" data-eid="' + e.id + '" aria-label="Remove entry">✕</button>' +
+        '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">' +
+        (key === "interviews" ? "Interview " : "Follow-up ") + (idx + 1) + "</label>" +
+        '<input type="date" value="' + (e.date || "") + '" data-key="' + key + '" data-eid="' + e.id + '" data-efield="date"></div>' +
+        '<textarea placeholder="Notes" data-key="' + key + '" data-eid="' + e.id + '" data-efield="notes">' + notesEsc + "</textarea>" +
+        "</div>";
+    }).join("");
+  }
+
+  function bindEntrySection(key, listId, addBtnId) {
+    document.getElementById(addBtnId).addEventListener("click", function () {
+      var job = findJob(state.activeId);
+      if (!job) return;
+      job[key].push({ id: uid(), date: "", notes: "" });
+      save();
+      renderEntries(job, key, listId);
+    });
+    var list = document.getElementById(listId);
+    list.addEventListener("input", function (e) {
+      var el = e.target;
+      var eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
+      if (!eid || !field) return;
+      var job = findJob(state.activeId);
+      if (!job) return;
+      var entry = job[key].find(function (x) { return x.id === eid; });
+      if (entry) { entry[field] = el.value; save(); }
+    });
+    list.addEventListener("click", function (e) {
+      var btn = e.target.closest('button[data-action="rm-entry"]');
+      if (!btn) return;
+      var job = findJob(state.activeId);
+      if (!job) return;
+      job[key] = job[key].filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
+      save();
+      renderEntries(job, key, listId);
+    });
+  }
+
+  bindEntrySection("interviews", "interviews-list", "add-interview");
+  bindEntrySection("followups", "followups-list", "add-followup");
+
+  renderTable();
+})();
+</script>
+
+</body></html>
