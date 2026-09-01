@@ -635,6 +635,37 @@
     background: var(--surface);
   }
 
+  .paste-modal {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.97);
+    width: min(440px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    z-index: 51;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+  .paste-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+  @media (prefers-reduced-motion: reduce) { .paste-modal { transition: none; } }
+  .paste-modal h2 { margin: 0 0 8px; font-size: 1.05rem; font-weight: 700; }
+  .paste-modal p { margin: 0 0 12px; font-size: 0.84rem; color: var(--ink-muted); line-height: 1.45; }
+  .paste-modal textarea {
+    width: 100%; min-height: 92px; font: inherit; font-size: 0.84rem; line-height: 1.5;
+    border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px;
+    background: var(--surface); color: var(--ink); resize: vertical;
+  }
+  .paste-modal textarea:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .paste-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  #paste-scrim { z-index: 50; }
+
   .stage-badge {
     font-size: 0.72rem;
     font-weight: 700;
@@ -794,6 +825,17 @@
     <button class="icon-btn danger" id="d-delete" type="button" aria-label="Delete record" title="Delete record">🗑</button>
   </div>
 </aside>
+
+<div class="scrim" id="paste-scrim"></div>
+<div class="paste-modal" id="paste-modal" aria-hidden="true" role="dialog" aria-labelledby="paste-modal-title">
+  <h2 id="paste-modal-title">Paste from bookmarklet</h2>
+  <p>Click "+ Add-job bookmarklet" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).</p>
+  <textarea id="paste-textarea" rows="4" placeholder="Position: ...&#10;Company: ...&#10;Posting: ..."></textarea>
+  <div class="paste-modal-actions">
+    <button type="button" id="paste-cancel" class="btn">Cancel</button>
+    <button type="button" id="paste-confirm" class="btn btn-primary">Add job</button>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -1067,23 +1109,39 @@
     return fields;
   }
 
-  document.getElementById("paste-btn").addEventListener("click", async function () {
-    if (!navigator.clipboard || !navigator.clipboard.readText) {
-      alert("This browser won't let the page read your clipboard. Paste into a new job's fields manually instead.");
-      return;
-    }
-    var text;
-    try {
-      text = await navigator.clipboard.readText();
-    } catch (e) {
-      alert("Couldn't read the clipboard — your browser may need permission. Try clicking this button again, or paste the fields in manually.");
-      return;
-    }
-    var fields = parseBookmarkletClipboard(text);
+  // A dialog the viewer pastes into (Cmd/Ctrl+V), rather than reading the clipboard
+  // programmatically — the artifact runs in an embedded page where clipboard-read
+  // permission is often unavailable and navigator.clipboard.readText() can hang
+  // indefinitely instead of failing, which left the old version looking inert.
+  var pasteScrim = document.getElementById("paste-scrim");
+  var pasteModal = document.getElementById("paste-modal");
+  var pasteTextarea = document.getElementById("paste-textarea");
+
+  function openPasteModal() {
+    pasteTextarea.value = "";
+    pasteScrim.classList.add("open");
+    pasteModal.classList.add("open");
+    pasteModal.setAttribute("aria-hidden", "false");
+    setTimeout(function () { pasteTextarea.focus(); }, 50);
+  }
+  function closePasteModal() {
+    pasteScrim.classList.remove("open");
+    pasteModal.classList.remove("open");
+    pasteModal.setAttribute("aria-hidden", "true");
+  }
+  document.getElementById("paste-btn").addEventListener("click", openPasteModal);
+  document.getElementById("paste-cancel").addEventListener("click", closePasteModal);
+  pasteScrim.addEventListener("click", closePasteModal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pasteModal.classList.contains("open")) closePasteModal();
+  });
+  document.getElementById("paste-confirm").addEventListener("click", function () {
+    var fields = parseBookmarkletClipboard(pasteTextarea.value);
     if (!fields.position && !fields.company && !fields.postingUrl) {
-      alert("Nothing that looks like a bookmarklet capture is on your clipboard right now. Click the \"+ Add-job bookmarklet\" on the job posting's page first, then try this again.");
+      alert("That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the job posting's page, copy again, then paste it here.");
       return;
     }
+    closePasteModal();
     addJobFromCapture(fields);
   });
 
