@@ -469,9 +469,24 @@
   .link-btn:hover { text-decoration: underline; }
   .link-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-  .linkedin-cell { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
-  .linkedin-cell input { flex: 1 1 auto; min-width: 0; }
-  .linkedin-cell a.icon-btn { flex: none; text-decoration: none; }
+  /* The td itself stays a plain block box so table-layout:fixed holds it to the exact
+     column width every row — putting display:flex directly on a table cell let its
+     content push that cell wider than its header in some rows, throwing columns out of
+     alignment. All the flex layout lives on this inner wrapper instead, which is forced
+     to the cell's own width and can't expand it. */
+  .linkedin-cell { padding: 0; }
+  .linkedin-inner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    padding-right: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .linkedin-inner input { flex: 1 1 auto; min-width: 0; }
+  .linkedin-inner a.icon-btn { flex: none; text-decoration: none; }
 
   .icon-btn {
     border: 1px solid var(--border);
@@ -1877,7 +1892,7 @@
         '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"></td>' +
         '<td class="cell-text">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
-        '<td class="linkedin-cell"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin">' + linkedinOpen + "</td>" +
+        '<td class="linkedin-cell"><div class="linkedin-inner"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin">' + linkedinOpen + "</div></td>" +
         "</tr>";
     }).join("");
   }
