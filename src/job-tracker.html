@@ -1,4 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="UTF-8">
 <title>Job Tracker</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -956,7 +957,7 @@
     }
   });
 
-  document.getElementById("drawer-body").addEventListener("input", function (e) {
+  document.getElementById("drawer").addEventListener("input", function (e) {
     var el = e.target;
     if (!state.activeId) return;
     var job = findJob(state.activeId);
@@ -970,10 +971,10 @@
       save();
     }
   });
-  document.getElementById("drawer-body").addEventListener("blur", function (e) {
+  document.getElementById("drawer").addEventListener("blur", function (e) {
     if (e.target.id === "d-position" || e.target.id === "d-company") save();
   }, true);
-  document.getElementById("drawer-body").addEventListener("change", function (e) {
+  document.getElementById("drawer").addEventListener("change", function (e) {
     if (e.target.id === "d-location" || e.target.id === "d-interviewing" || e.target.tagName === "INPUT") save();
   });
 
