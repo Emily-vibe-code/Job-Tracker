@@ -1499,7 +1499,50 @@
   state.colWidths = loadColWidths();
 
   // ---------- Column definitions per stage ----------
-  var ACTIONS_COL_WIDTH = 224;
+  // The Actions column is deliberately not resizable — instead it auto-sizes to
+  // whatever buttons the current tab actually needs (Jobs has one move button,
+  // Applied/Interviewing have two, Rejected/Contacts have fewer), measured off-screen
+  // rather than guessing one fixed width that's inevitably wrong for some tab.
+  var actionsWidthCache = {};
+  function measureRowActionsWidth(cacheKey, innerHtml) {
+    if (actionsWidthCache[cacheKey] !== undefined) return actionsWidthCache[cacheKey];
+    var probe = document.createElement("div");
+    probe.className = "row-actions";
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    probe.style.left = "-9999px";
+    probe.style.top = "0";
+    probe.style.width = "auto";
+    probe.innerHTML = innerHtml;
+    document.body.appendChild(probe);
+    var w = Math.ceil(probe.getBoundingClientRect().width);
+    document.body.removeChild(probe);
+    var padded = w + 8; // small safety buffer beyond the measured content
+    actionsWidthCache[cacheKey] = padded;
+    return padded;
+  }
+
+  function moveBtnsForStage(stage, id) {
+    if (stage === "jobs") return '<button class="move-btn" data-action="to-applied" data-id="' + id + '">Applied →</button>';
+    if (stage === "applied") return '<button class="move-btn back" data-action="to-jobs" data-id="' + id + '">← Jobs</button>' +
+      '<button class="move-btn" data-action="to-rejected" data-id="' + id + '">Rejected →</button>';
+    if (stage === "interviewing") return '<button class="move-btn back" data-action="to-applied" data-id="' + id + '">← Applied</button>' +
+      '<button class="move-btn" data-action="to-rejected" data-id="' + id + '">Rejected →</button>';
+    if (stage === "rejected") return '<button class="move-btn back" data-action="to-applied" data-id="' + id + '">← Applied</button>';
+    return "";
+  }
+
+  function jobActionsInnerHtml(stage, id) {
+    return '<button class="icon-btn" data-action="view" data-id="' + id + '" title="Open record" aria-label="Open record">⤢</button>' +
+      moveBtnsForStage(stage, id) +
+      '<button class="icon-btn danger" data-action="delete" data-id="' + id + '" title="Delete" aria-label="Delete">🗑</button>';
+  }
+
+  function contactActionsInnerHtml(cid) {
+    return '<button class="icon-btn" data-action="view-contact" data-cid="' + cid + '" title="Open contact" aria-label="Open contact">⤢</button>' +
+      '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + cid + '" title="Delete" aria-label="Delete">🗑</button>';
+  }
+
   var BASE_COLS = [
     { key: "date", label: "Date", type: "date", w: "112px" },
     { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
@@ -1526,15 +1569,30 @@
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
 
   // ---------- Tabs ----------
+  var ACTIVE_TAB_KEY = "jobTrackerActiveTab.v1";
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var validStages = tabs.map(function (t) { return t.getAttribute("data-stage"); });
+
+  function selectTab(stage, opts) {
+    state.activeStage = stage;
+    tabs.forEach(function (o) { o.setAttribute("aria-selected", o.getAttribute("data-stage") === stage ? "true" : "false"); });
+    if (!opts || !opts.skipSave) {
+      try { localStorage.setItem(ACTIVE_TAB_KEY, stage); } catch (e) { /* per-device preference only */ }
+    }
+  }
+
   tabs.forEach(function (t) {
     t.addEventListener("click", function () {
-      state.activeStage = t.getAttribute("data-stage");
-      tabs.forEach(function (o) { o.setAttribute("aria-selected", o === t ? "true" : "false"); });
+      selectTab(t.getAttribute("data-stage"));
       state.sortKey = null;
       renderTable();
     });
   });
+
+  try {
+    var savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+    if (savedTab && validStages.indexOf(savedTab) !== -1) selectTab(savedTab, { skipSave: true });
+  } catch (e) { /* default tab stands */ }
 
   // ---------- Search ----------
   var searchInput = document.getElementById("search-input");
@@ -1747,9 +1805,10 @@
     // mechanism browsers reliably re-layout when a width changes after initial render;
     // relying on <th> cell widths alone left drag-resize updating the inline style
     // without ever visibly reflowing the columns.
+    var actionsW = measureRowActionsWidth("job_" + stage, jobActionsInnerHtml(stage, "x"));
     var colgroup = document.getElementById("colgroup");
-    var totalW = ACTIONS_COL_WIDTH;
-    colgroup.innerHTML = '<col data-key="actions" style="width:' + ACTIONS_COL_WIDTH + 'px">' + cols.map(function (c) {
+    var totalW = actionsW;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + cols.map(function (c) {
       var w = state.colWidths[c.key] || parseInt(c.w, 10);
       totalW += w;
       return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
@@ -1791,25 +1850,8 @@
         return '<td class="' + cls + '">' + cellHtml(job, c) + "</td>";
       }).join("");
 
-      var moveBtns = "";
-      if (stage === "jobs") {
-        moveBtns = '<button class="move-btn" data-action="to-applied" data-id="' + job.id + '">Applied →</button>';
-      } else if (stage === "applied") {
-        moveBtns = '<button class="move-btn back" data-action="to-jobs" data-id="' + job.id + '">← Jobs</button>' +
-          '<button class="move-btn" data-action="to-rejected" data-id="' + job.id + '">Rejected →</button>';
-      } else if (stage === "interviewing") {
-        moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>' +
-          '<button class="move-btn" data-action="to-rejected" data-id="' + job.id + '">Rejected →</button>';
-      } else if (stage === "rejected") {
-        moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>';
-      }
-
       return '<tr data-id="' + job.id + '">' +
-        '<td class="actions-col"><div class="row-actions">' +
-        '<button class="icon-btn" data-action="view" data-id="' + job.id + '" title="Open record" aria-label="Open record">⤢</button>' +
-        moveBtns +
-        '<button class="icon-btn danger" data-action="delete" data-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
-        "</div></td>" + cells + "</tr>";
+        '<td class="actions-col"><div class="row-actions">' + jobActionsInnerHtml(stage, job.id) + "</div></td>" + cells + "</tr>";
     }).join("");
   }
 
@@ -1890,9 +1932,10 @@
       entries = entries.slice().sort(function (a, b) { return compareContacts(a, b, sortCol.key, state.sortDir); });
     }
 
+    var actionsW = measureRowActionsWidth("contacts", contactActionsInnerHtml("x"));
     var colgroup = document.getElementById("colgroup");
-    var totalW = ACTIONS_COL_WIDTH;
-    colgroup.innerHTML = '<col data-key="actions" style="width:' + ACTIONS_COL_WIDTH + 'px">' + CONTACT_COLS.map(function (c) {
+    var totalW = actionsW;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + CONTACT_COLS.map(function (c) {
       var w = state.colWidths["contact_" + c.key] || parseInt(c.w, 10);
       totalW += w;
       return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
@@ -1933,10 +1976,7 @@
         ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
         : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
       return '<tr data-cid="' + c.id + '">' +
-        '<td class="actions-col"><div class="row-actions">' +
-        '<button class="icon-btn" data-action="view-contact" data-cid="' + c.id + '" title="Open contact" aria-label="Open contact">⤢</button>' +
-        '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + c.id + '" title="Delete" aria-label="Delete">🗑</button>' +
-        "</div></td>" +
+        '<td class="actions-col"><div class="row-actions">' + contactActionsInnerHtml(c.id) + "</div></td>" +
         '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"></td>' +
         '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"></td>' +
         '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"></td>' +
