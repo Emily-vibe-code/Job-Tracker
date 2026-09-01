@@ -327,13 +327,16 @@
   tbody tr:hover { background: var(--surface-alt); }
   tbody tr:hover td { background: var(--surface-alt); }
 
-  /* Actions column stays put while the rest of the sheet scrolls horizontally */
+  /* Actions column stays put while the rest of the sheet scrolls horizontally.
+     Its right edge is a deliberately darker divider — a visual cue that this column
+     is pinned and everything past it is what's actually scrolling. */
   .actions-col {
     position: sticky;
     left: 0;
     z-index: 2;
     background: var(--surface);
-    box-shadow: 1px 0 0 var(--border-strong);
+    border-right: none;
+    box-shadow: 2px 0 0 var(--ink-muted);
   }
   thead th.actions-col { z-index: 3; background: var(--surface-alt); }
   tbody tr:hover td.actions-col { background: var(--surface-alt); }
