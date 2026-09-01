@@ -1026,6 +1026,16 @@
 
   function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
+  // True while a cell in the main sheet (not the drawer, which has its own state.activeId /
+  // cdActiveId guard) is focused for editing. A cloud sync delivery arriving mid-edit —
+  // e.g. the debounced write from this same keystroke, landing ~500ms later — must not
+  // rebuild the table underneath the viewer's cursor, or it silently steals focus and
+  // cuts off typing partway through, which read like a "timeout."
+  function isEditingInline() {
+    var el = document.activeElement;
+    return !!(el && el.closest && el.closest("#tbody"));
+  }
+
   function loadColWidths() {
     try {
       var raw = localStorage.getItem(COLWIDTH_KEY);
@@ -1141,7 +1151,7 @@
       // landed), applying this snapshot could silently wipe that job out of state.jobs —
       // same race the live listener below already guards against. Also true while a
       // contact's own drawer is open, since that edits a job object too.
-      if (!snap.empty && !state.activeId && !cdActiveId) {
+      if (!snap.empty && !state.activeId && !cdActiveId && !isEditingInline()) {
         state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
         localSave();
         renderTable();
@@ -1152,7 +1162,7 @@
 
     try {
       var cSnap = await contactsCol.orderBy("createdAt").get();
-      if (!cSnap.empty && !state.activeId && !cdActiveId) {
+      if (!cSnap.empty && !state.activeId && !cdActiveId && !isEditingInline()) {
         state.contacts = cSnap.docs.map(function (d) { return normalizeContact(d.data()); });
         localSaveContacts();
         renderTable();
@@ -1163,7 +1173,7 @@
     migrateEmbeddedContacts();
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId || cdActiveId) return; // don't clobber an in-progress edit
+      if (state.activeId || cdActiveId || isEditingInline()) return; // don't clobber an in-progress edit
       var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
       state.jobs = jobs;
       localSave();
@@ -1174,7 +1184,7 @@
     });
 
     contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId || cdActiveId) return;
+      if (state.activeId || cdActiveId || isEditingInline()) return;
       state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
       localSaveContacts();
       renderTable();
@@ -2581,7 +2591,7 @@
 
   // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
   window.addEventListener("storage", function (e) {
-    if (state.activeId || cdActiveId) return;
+    if (state.activeId || cdActiveId || isEditingInline()) return;
     if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
   });
@@ -2589,6 +2599,18 @@
   wireUrlField("d-companyUrl", "d-companyUrl-open");
   wireUrlField("d-postingUrl", "d-postingUrl-open");
   wireUrlField("cd-linkedin", "cd-linkedin-open");
+
+  // Pressing Enter in any field commits it (blurs, so the value saves and the field is
+  // free to pick up external updates again) instead of leaving the viewer wondering
+  // whether it "took." Textareas are excluded so Enter still inserts a newline there.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var el = e.target;
+    if (el.tagName === "INPUT" && el.type !== "checkbox" && el.type !== "radio") {
+      e.preventDefault();
+      el.blur();
+    }
+  });
 
   renderTable();
   initExport();
