@@ -678,6 +678,8 @@
   .export-link:hover { color: var(--accent); }
   .export-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+  .bookmarklet-hint { color: var(--ink-faint); font-size: 0.72rem; }
+
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -690,7 +692,7 @@
   <header class="topbar">
     <div>
       <h1>Job Tracker</h1>
-      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span> <button type="button" id="export-btn" class="export-link">Export backup</button></div>
+      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span> <button type="button" id="export-btn" class="export-link">Export backup</button> · <a href="#" id="bookmarklet-link" class="export-link">+ Add-job bookmarklet</a> <span class="bookmarklet-hint">(drag to your bookmarks bar)</span></div>
     </div>
     <div class="stats" id="stats"></div>
   </header>
@@ -748,6 +750,7 @@
         <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
         <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
         <div class="field span-2"><label for="d-companyUrl">Company URL</label><input type="text" id="d-companyUrl" placeholder="https://"></div>
+        <div class="field span-2"><label for="d-postingUrl">Job posting link</label><input type="text" id="d-postingUrl" placeholder="https://"></div>
         <div class="field span-2"><label for="d-values">Company values</label><textarea id="d-values" placeholder="Culture, mission, values that stood out"></textarea></div>
       </div>
     </div>
@@ -953,6 +956,84 @@
 
   exportBtn.addEventListener("click", exportBackup);
 
+  // ---------- "Add from this page" bookmarklet ----------
+  // A draggable javascript: link. On a job posting page it reads Schema.org JobPosting
+  // structured data when present (most ATSes emit it), falls back to guessing from the
+  // page title, copies a plain-text summary to the clipboard as a backup, and opens this
+  // tracker with the guess pre-filled so the viewer can confirm before it's saved.
+  // Address of YOUR published copy of this page. Only the bookmarklet uses it (to open the tracker
+  // after capturing a posting). Replace it with the link to your own artifact before using the bookmarklet.
+  var TRACKER_URL = "https://claude.ai/artifact/YOUR-ARTIFACT-ID";
+  var BOOKMARKLET_SRC = [
+    "(function(){",
+    "function meta(n){var e=document.querySelector('meta[property=\"'+n+'\"]')||document.querySelector('meta[name=\"'+n+'\"]');return e?e.content:'';}",
+    "function findJobPosting(){",
+    "var scripts=document.querySelectorAll('script[type=\"application/ld+json\"]');",
+    "for(var i=0;i<scripts.length;i++){",
+    "try{",
+    "var data=JSON.parse(scripts[i].textContent);",
+    "var items=Array.isArray(data)?data:(data['@graph']||[data]);",
+    "for(var j=0;j<items.length;j++){",
+    "var it=items[j];",
+    "if(it&&(it['@type']==='JobPosting'||(Array.isArray(it['@type'])&&it['@type'].indexOf('JobPosting')>-1)))return it;",
+    "}",
+    "}catch(e){}",
+    "}",
+    "return null;",
+    "}",
+    "var jp=findJobPosting();",
+    "var position='',company='',workMode='';",
+    "if(jp){",
+    "position=jp.title||'';",
+    "company=(jp.hiringOrganization&&jp.hiringOrganization.name)||'';",
+    "var loc=jp.jobLocationType||'';",
+    "if(/telecommute|remote/i.test(loc))workMode='Remote';",
+    "}",
+    "if(!position||!company){",
+    "var t=meta('og:title')||document.title||'';",
+    "var seps=[' at ',' - ',' | ',' — ',' :: '];",
+    "for(var s=0;s<seps.length;s++){",
+    "if(t.indexOf(seps[s])>-1){",
+    "var parts=t.split(seps[s]);",
+    "if(!position)position=parts[0].trim();",
+    "if(!company&&parts[1])company=parts[1].trim();",
+    "break;",
+    "}",
+    "}",
+    "if(!position)position=t;",
+    "}",
+    "var params=new URLSearchParams();",
+    "params.set('add','1');",
+    "params.set('position',position);",
+    "params.set('company',company);",
+    "params.set('postingUrl',window.location.href);",
+    "if(workMode)params.set('location',workMode);",
+    "try{navigator.clipboard.writeText('Position: '+position+'\\nCompany: '+company+'\\nPosting: '+window.location.href);}catch(e){}",
+    "window.open('" + TRACKER_URL + "?'+params.toString(),'_blank');",
+    "})();"
+  ].join("");
+  document.getElementById("bookmarklet-link").href = "javascript:" + BOOKMARKLET_SRC;
+  document.getElementById("bookmarklet-link").addEventListener("click", function (e) { e.preventDefault(); });
+
+  function handleBookmarkletAdd() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("add") !== "1") return;
+    var job = blankJob();
+    job.date = todayStr();
+    job.position = params.get("position") || "";
+    job.company = params.get("company") || "";
+    job.postingUrl = params.get("postingUrl") || "";
+    var loc = params.get("location");
+    if (loc === "Remote" || loc === "Hybrid" || loc === "On-site") job.location = loc;
+    state.jobs.push(job);
+    save(job, true);
+    state.activeStage = "jobs";
+    tabs.forEach(function (o) { o.setAttribute("aria-selected", o.getAttribute("data-stage") === "jobs" ? "true" : "false"); });
+    renderTable();
+    openDrawer(job.id);
+    history.replaceState(null, "", window.location.pathname);
+  }
+
   function blankJob() {
     return {
       id: uid(), stage: "jobs", createdAt: Date.now(),
@@ -961,7 +1042,7 @@
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
       dateRejected: "",
-      companyUrl: "", values: "", notes: "",
+      companyUrl: "", postingUrl: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
     };
   }
@@ -1306,7 +1387,7 @@
   var scrim = document.getElementById("scrim");
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
-    "pto", "medical", "companyUrl", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
+    "pto", "medical", "companyUrl", "postingUrl", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
@@ -1521,8 +1602,8 @@
   });
 
   renderTable();
-  initCloudSync();
   initExport();
+  initCloudSync().then(handleBookmarkletAdd);
 })();
 </script>
 
