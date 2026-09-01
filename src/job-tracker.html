@@ -721,6 +721,7 @@
     </div>
     <div class="add-row">
       <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
+      <button class="btn" id="paste-btn" type="button">+ Paste from bookmarklet</button>
     </div>
   </div>
 </div>
@@ -1008,31 +1009,83 @@
     "params.set('company',company);",
     "params.set('postingUrl',window.location.href);",
     "if(workMode)params.set('location',workMode);",
-    "try{navigator.clipboard.writeText('Position: '+position+'\\nCompany: '+company+'\\nPosting: '+window.location.href);}catch(e){}",
+    "if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText('Position: '+position+'\\nCompany: '+company+'\\nPosting: '+window.location.href).catch(function(){});}",
     "window.open('" + TRACKER_URL + "?'+params.toString(),'_blank');",
     "})();"
   ].join("");
   document.getElementById("bookmarklet-link").href = "javascript:" + BOOKMARKLET_SRC;
   document.getElementById("bookmarklet-link").addEventListener("click", function (e) { e.preventDefault(); });
 
-  function handleBookmarkletAdd() {
-    var params = new URLSearchParams(window.location.search);
-    if (params.get("add") !== "1") return;
+  // Creates a job from captured {position, company, postingUrl, location} and opens it
+  // for review. Shared by the URL-param path (handleBookmarkletAdd) and the clipboard
+  // fallback (pasteFromBookmarklet) — claude.ai doesn't reliably pass the bookmarklet's
+  // URL parameters through, so the clipboard path is the one that actually works today.
+  function addJobFromCapture(fields) {
     var job = blankJob();
     job.date = todayStr();
-    job.position = params.get("position") || "";
-    job.company = params.get("company") || "";
-    job.postingUrl = params.get("postingUrl") || "";
-    var loc = params.get("location");
-    if (loc === "Remote" || loc === "Hybrid" || loc === "On-site") job.location = loc;
+    job.position = fields.position || "";
+    job.company = fields.company || "";
+    job.postingUrl = fields.postingUrl || "";
+    if (fields.location === "Remote" || fields.location === "Hybrid" || fields.location === "On-site") {
+      job.location = fields.location;
+    }
     state.jobs.push(job);
     save(job, true);
     state.activeStage = "jobs";
     tabs.forEach(function (o) { o.setAttribute("aria-selected", o.getAttribute("data-stage") === "jobs" ? "true" : "false"); });
     renderTable();
     openDrawer(job.id);
+    return job;
+  }
+
+  function handleBookmarkletAdd() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("add") !== "1") return;
+    addJobFromCapture({
+      position: params.get("position"),
+      company: params.get("company"),
+      postingUrl: params.get("postingUrl"),
+      location: params.get("location")
+    });
     history.replaceState(null, "", window.location.pathname);
   }
+
+  // Parses the "Position: ...\nCompany: ...\nPosting: ..." text the bookmarklet copies
+  // to the clipboard. Tolerates the lines appearing in any order or with extra lines
+  // around them (in case the clipboard held something else appended after copying).
+  function parseBookmarkletClipboard(text) {
+    var fields = { position: "", company: "", postingUrl: "" };
+    (text || "").split("\n").forEach(function (line) {
+      var m = line.match(/^\s*(Position|Company|Posting)\s*:\s*(.*)$/i);
+      if (!m) return;
+      var key = m[1].toLowerCase();
+      var val = m[2].trim();
+      if (key === "position") fields.position = val;
+      else if (key === "company") fields.company = val;
+      else if (key === "posting") fields.postingUrl = val;
+    });
+    return fields;
+  }
+
+  document.getElementById("paste-btn").addEventListener("click", async function () {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      alert("This browser won't let the page read your clipboard. Paste into a new job's fields manually instead.");
+      return;
+    }
+    var text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (e) {
+      alert("Couldn't read the clipboard — your browser may need permission. Try clicking this button again, or paste the fields in manually.");
+      return;
+    }
+    var fields = parseBookmarkletClipboard(text);
+    if (!fields.position && !fields.company && !fields.postingUrl) {
+      alert("Nothing that looks like a bookmarklet capture is on your clipboard right now. Click the \"+ Add-job bookmarklet\" on the job posting's page first, then try this again.");
+      return;
+    }
+    addJobFromCapture(fields);
+  });
 
   function blankJob() {
     return {
