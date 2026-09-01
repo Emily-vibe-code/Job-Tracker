@@ -468,6 +468,10 @@
   .link-btn:hover { text-decoration: underline; }
   .link-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+  .linkedin-cell { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
+  .linkedin-cell input { flex: 1 1 auto; min-width: 0; }
+  .linkedin-cell a.icon-btn { flex: none; text-decoration: none; }
+
   .icon-btn {
     border: 1px solid var(--border);
     background: var(--surface);
@@ -836,8 +840,9 @@
       <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
       <button class="btn" id="paste-btn" type="button">+ Paste from bookmarklet</button>
     </div>
-    <div class="add-row" id="contacts-hint" style="display:none;">
-      <span class="bookmarklet-hint">Contacts are added from a job's detail view — open a job, then "+ Add contact."</span>
+    <div class="add-row" id="contacts-add-row" style="display:none;">
+      <button class="btn btn-primary" id="add-contact-standalone" type="button">+ Add contact</button>
+      <span class="bookmarklet-hint">Or add one from any job's detail view.</span>
     </div>
   </div>
 </div>
@@ -987,7 +992,7 @@
 
   var STORAGE_KEY = "jobTrackerData.v1";
   var COLWIDTH_KEY = "jobTrackerColWidths.v1";
-  var state = { activeStage: "jobs", activeId: null, jobs: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
+  var state = { activeStage: "jobs", activeId: null, jobs: [], contacts: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
 
   function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -1098,6 +1103,7 @@
       return;
     }
     jobsCol = dbApi.collection("jobs");
+    contactsCol = dbApi.collection("contacts");
     try {
       var snap = await jobsCol.orderBy("createdAt").get();
       // If a drawer is already open by the time this resolves (e.g. the viewer opened
@@ -1105,7 +1111,7 @@
       // landed), applying this snapshot could silently wipe that job out of state.jobs —
       // same race the live listener below already guards against. Also true while a
       // contact's own drawer is open, since that edits a job object too.
-      if (!snap.empty && !state.activeId && !cdActive.cid) {
+      if (!snap.empty && !state.activeId && !cdActiveId) {
         state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
         localSave();
         renderTable();
@@ -1114,11 +1120,33 @@
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
 
+    try {
+      var cSnap = await contactsCol.orderBy("createdAt").get();
+      if (!cSnap.empty && !state.activeId && !cdActiveId) {
+        state.contacts = cSnap.docs.map(function (d) { return normalizeContact(d.data()); });
+        localSaveContacts();
+        renderTable();
+      } else if (cSnap.empty && state.contacts.length) {
+        state.contacts.forEach(function (c) { saveContact(c, true); });
+      }
+    } catch (e) { /* keep whatever loaded from localStorage */ }
+    migrateEmbeddedContacts();
+
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId || cdActive.cid) return; // don't clobber an in-progress edit
+      if (state.activeId || cdActiveId) return; // don't clobber an in-progress edit
       var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
       state.jobs = jobs;
       localSave();
+      migrateEmbeddedContacts();
+      renderTable();
+    }, function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+
+    contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
+      if (state.activeId || cdActiveId) return;
+      state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
+      localSaveContacts();
       renderTable();
     }, function () {
       setSyncStatus("off", "Sync paused — changes are saved on this device");
@@ -1333,7 +1361,95 @@
     };
   }
 
+  // ---------- Contacts (top-level, same pattern as jobs) ----------
+  // Contacts are their own collection so they can exist without a job. jobId is set
+  // when a contact was added from (or later linked to) a specific job's detail view;
+  // it's null/empty for a standalone contact.
+  var CONTACTS_STORAGE_KEY = "jobTrackerContacts.v1";
+  var contactsCol = null;
+  var contactWriteTimers = {};
+
+  function blankContact() {
+    return {
+      id: uid(), jobId: null, createdAt: Date.now(),
+      name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: ""
+    };
+  }
+
+  function loadContacts() {
+    try {
+      var raw = localStorage.getItem(CONTACTS_STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.contacts)) return parsed.contacts;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return [];
+  }
+
+  function localSaveContacts() {
+    try { localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify({ contacts: state.contacts })); } catch (e) { /* in-memory only for this session */ }
+  }
+
+  function saveContact(contact, immediate) {
+    localSaveContacts();
+    if (!contactsCol || !contact) return;
+    var id = contact.id;
+    if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
+    var body = JSON.parse(JSON.stringify(contact));
+    var doWrite = function () {
+      delete contactWriteTimers[id];
+      contactsCol.doc(id).set(body).catch(function () {
+        setSyncStatus("off", "Sync paused — changes are saved on this device");
+      });
+    };
+    if (immediate) doWrite(); else contactWriteTimers[id] = setTimeout(doWrite, 500);
+  }
+
+  function deleteContactFromDb(id) {
+    if (!contactsCol) return;
+    if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
+    contactsCol.doc(id).delete().catch(function () { /* local copy still removed either way */ });
+  }
+
+  function normalizeContact(data) {
+    var c = blankContact();
+    Object.keys(c).forEach(function (k) {
+      if (data && data[k] !== undefined) c[k] = data[k];
+    });
+    if (data && data.id) c.id = data.id;
+    return c;
+  }
+
+  // One-time (idempotent) upgrade path: older records kept contacts nested inside
+  // job.contacts. Lifts any still found there into the top-level state.contacts so
+  // they behave exactly like every other contact, including the ones added standalone.
+  function migrateEmbeddedContacts() {
+    var touchedJobs = [], newContacts = [];
+    state.jobs.forEach(function (job) {
+      if (Array.isArray(job.contacts) && job.contacts.length) {
+        job.contacts.forEach(function (c) {
+          if (!c.jobId) c.jobId = job.id;
+          if (!state.contacts.some(function (x) { return x.id === c.id; })) {
+            state.contacts.push(c);
+            newContacts.push(c);
+          }
+        });
+        job.contacts = [];
+        touchedJobs.push(job);
+      }
+    });
+    if (touchedJobs.length || newContacts.length) {
+      localSaveContacts();
+      localSave();
+      touchedJobs.forEach(function (j) { save(j, true); });
+      newContacts.forEach(function (c) { saveContact(c, true); });
+    }
+  }
+
   state.jobs = load();
+  state.contacts = loadContacts();
+  migrateEmbeddedContacts();
   state.colWidths = loadColWidths();
 
   // ---------- Column definitions per stage ----------
@@ -1422,8 +1538,11 @@
     var col = document.querySelector('#colgroup col[data-key="' + key + '"]');
     if (!col) return;
     var table = document.getElementById("table");
+    // Contacts tab columns share some names with job columns (e.g. "company") — store
+    // their widths under a separate namespace so resizing one tab never touches the other.
+    var storageKey = state.activeStage === "contacts" ? "contact_" + key : key;
     resizeDrag = {
-      key: key,
+      key: storageKey,
       col: col,
       table: table,
       startX: e.clientX,
@@ -1559,7 +1678,7 @@
     var stage = state.activeStage;
 
     document.getElementById("add-row").style.display = stage === "contacts" ? "none" : "flex";
-    document.getElementById("contacts-hint").style.display = stage === "contacts" ? "flex" : "none";
+    document.getElementById("contacts-add-row").style.display = stage === "contacts" ? "flex" : "none";
     document.getElementById("search-input").placeholder = stage === "contacts" ? "Search by name or company" : "Search by company name";
 
     if (stage === "contacts") { renderContactsTab(); return; }
@@ -1653,13 +1772,13 @@
   // Company/LinkedIn as clickable links instead of editable cells (editing still happens
   // in the owning job's drawer, or this contact's own drawer).
   var CONTACT_COLS = [
-    { key: "name", label: "Name", w: "150px" },
-    { key: "connection", label: "Connection", w: "130px" },
-    { key: "phone", label: "Phone number", w: "140px" },
-    { key: "email", label: "Email address", w: "190px" },
-    { key: "company", label: "Company", w: "160px" },
-    { key: "dateOfContact", label: "Date of contact", w: "130px" },
-    { key: "linkedin", label: "LinkedIn", w: "110px" }
+    { key: "name", label: "Name", type: "text", w: "150px" },
+    { key: "connection", label: "Connection", type: "text", w: "130px" },
+    { key: "phone", label: "Phone number", type: "tel", w: "140px" },
+    { key: "email", label: "Email address", type: "email", w: "190px" },
+    { key: "company", label: "Company", type: "link", w: "160px" },
+    { key: "dateOfContact", label: "Date of contact", type: "date", w: "130px" },
+    { key: "linkedin", label: "LinkedIn", type: "url", w: "170px" }
   ];
 
   function normalizeUrl(u) {
@@ -1668,17 +1787,18 @@
     return /^https?:\/\//i.test(u) ? u : "https://" + u;
   }
 
-  function getAllContacts() {
-    var out = [];
-    state.jobs.forEach(function (job) {
-      (job.contacts || []).forEach(function (c) { out.push({ contact: c, job: job }); });
-    });
-    return out;
-  }
+  function getAllContacts() { return state.contacts; }
 
   function compareContacts(a, b, key, dir) {
-    var av = key === "company" ? (a.job.company || "") : (a.contact[key] || "");
-    var bv = key === "company" ? (b.job.company || "") : (b.contact[key] || "");
+    var av, bv;
+    if (key === "company") {
+      var aJob = a.jobId ? findJob(a.jobId) : null;
+      var bJob = b.jobId ? findJob(b.jobId) : null;
+      av = aJob ? (aJob.company || "") : "";
+      bv = bJob ? (bJob.company || "") : "";
+    } else {
+      av = a[key] || ""; bv = b[key] || "";
+    }
     var as = av.toString().toLowerCase(), bs = bv.toString().toLowerCase();
     var cmp;
     if (as === "" && bs === "") cmp = 0;
@@ -1689,14 +1809,15 @@
   }
 
   function renderContactsTab() {
-    var entries = getAllContacts();
+    var entries = state.contacts;
 
     var searching = !!state.search.trim();
     if (searching) {
       var q = state.search.trim().toLowerCase();
-      entries = entries.filter(function (e) {
-        return (e.contact.name || "").toLowerCase().indexOf(q) !== -1 ||
-          (e.job.company || "").toLowerCase().indexOf(q) !== -1;
+      entries = entries.filter(function (c) {
+        var job = c.jobId ? findJob(c.jobId) : null;
+        return (c.name || "").toLowerCase().indexOf(q) !== -1 ||
+          (job && (job.company || "").toLowerCase().indexOf(q) !== -1);
       });
     }
 
@@ -1707,9 +1828,10 @@
 
     var colgroup = document.getElementById("colgroup");
     var totalW = ACTIONS_COL_WIDTH;
-    colgroup.innerHTML = '<col style="width:' + ACTIONS_COL_WIDTH + 'px">' + CONTACT_COLS.map(function (c) {
-      totalW += parseInt(c.w, 10);
-      return '<col style="width:' + c.w + '">';
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + ACTIONS_COL_WIDTH + 'px">' + CONTACT_COLS.map(function (c) {
+      var w = state.colWidths["contact_" + c.key] || parseInt(c.w, 10);
+      totalW += w;
+      return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
     }).join("");
     document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
 
@@ -1718,7 +1840,8 @@
       var active = sortCol && sortCol.key === c.key;
       var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
       return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key + '" tabindex="0">' +
-        c.label + '<span class="arrow">' + arrow + "</span></th>";
+        c.label + '<span class="arrow">' + arrow + "</span>" +
+        '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
     }).join("");
 
     var hintEl = document.getElementById("sort-hint");
@@ -1728,32 +1851,32 @@
     if (entries.length === 0) {
       var heading = searching ? "No contacts match “" + escapeHtml(state.search.trim()) + "”" : "No contacts yet";
       var body = searching ? "Try a different spelling, or clear the search." :
-        "Add a contact from any job's detail view, and it'll show up here.";
+        "Click \"+ Add contact\" below, or add one from any job's detail view.";
       tbody.innerHTML = '<tr><td colspan="' + (CONTACT_COLS.length + 1) + '"><div class="empty"><h2>' + heading + "</h2><p>" + body + "</p></div></td></tr>";
       return;
     }
 
-    tbody.innerHTML = entries.map(function (entry) {
-      var c = entry.contact, job = entry.job;
-      var companyName = job.company || "(no company)";
-      var linkedinCell = c.linkedin
-        ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener">LinkedIn ↗</a>'
+    tbody.innerHTML = entries.map(function (c) {
+      var job = c.jobId ? findJob(c.jobId) : null;
+      var companyCell = job
+        ? '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.company || job.position || "Untitled job") + "</button>"
         : '<span style="color:var(--ink-faint);">—</span>';
-      var phoneDigits = (c.phone || "").replace(/[^\d+]/g, "");
-      var phoneCell = c.phone ? '<a href="tel:' + escapeHtml(phoneDigits) + '">' + escapeHtml(c.phone) + "</a>" : "";
-      var emailCell = c.email ? '<a href="mailto:' + escapeHtml(c.email) + '">' + escapeHtml(c.email) + "</a>" : "";
-      return '<tr data-cid="' + c.id + '" data-job-id="' + job.id + '">' +
+      var esc = function (v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); };
+      var linkedinOpen = c.linkedin
+        ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
+        : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
+      return '<tr data-cid="' + c.id + '">' +
         '<td class="actions-col"><div class="row-actions">' +
-        '<button class="icon-btn" data-action="view-contact" data-cid="' + c.id + '" data-job-id="' + job.id + '" title="Open contact" aria-label="Open contact">⤢</button>' +
-        '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + c.id + '" data-job-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
+        '<button class="icon-btn" data-action="view-contact" data-cid="' + c.id + '" title="Open contact" aria-label="Open contact">⤢</button>' +
+        '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + c.id + '" title="Delete" aria-label="Delete">🗑</button>' +
         "</div></td>" +
-        '<td class="cell-text">' + escapeHtml(c.name || "") + "</td>" +
-        '<td class="cell-text">' + escapeHtml(c.connection || "") + "</td>" +
-        '<td class="cell-text">' + phoneCell + "</td>" +
-        '<td class="cell-text">' + emailCell + "</td>" +
-        '<td class="cell-text"><button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(companyName) + "</button></td>" +
-        '<td class="cell-text">' + escapeHtml(c.dateOfContact || "") + "</td>" +
-        '<td class="cell-text">' + linkedinCell + "</td>" +
+        '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"></td>' +
+        '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"></td>' +
+        '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"></td>' +
+        '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"></td>' +
+        '<td class="cell-text">' + companyCell + "</td>" +
+        '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
+        '<td class="linkedin-cell"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin">' + linkedinOpen + "</td>" +
         "</tr>";
     }).join("");
   }
@@ -1762,19 +1885,49 @@
     var openJobBtn = e.target.closest('button[data-action="open-job"]');
     if (openJobBtn) { openDrawer(openJobBtn.getAttribute("data-job-id")); return; }
     var viewContactBtn = e.target.closest('button[data-action="view-contact"]');
-    if (viewContactBtn) { openContactDrawer(viewContactBtn.getAttribute("data-job-id"), viewContactBtn.getAttribute("data-cid")); return; }
+    if (viewContactBtn) { openContactDrawer(viewContactBtn.getAttribute("data-cid")); return; }
     var delContactBtn = e.target.closest('button[data-action="delete-contact"]');
-    if (delContactBtn) { deleteContactFromTable(delContactBtn.getAttribute("data-job-id"), delContactBtn.getAttribute("data-cid")); return; }
+    if (delContactBtn) { deleteContactFromTable(delContactBtn.getAttribute("data-cid")); return; }
   });
 
-  async function deleteContactFromTable(jobId, cid) {
-    if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
-    var job = findJob(jobId);
-    if (!job) return;
-    job.contacts = (job.contacts || []).filter(function (c) { return c.id !== cid; });
-    save(job, true);
+  document.getElementById("tbody").addEventListener("dblclick", function (e) {
+    if (state.activeStage !== "contacts" || e.target.closest(".actions-col")) return;
+    var row = e.target.closest("tr[data-cid]");
+    if (row) openContactDrawer(row.getAttribute("data-cid"));
+  });
+
+  document.getElementById("tbody").addEventListener("input", function (e) {
+    var el = e.target;
+    var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
+    if (!cid || !field) return;
+    var c = findContact(cid);
+    if (!c) return;
+    c[field] = el.value;
+    saveContact(c, false);
+    if (field === "linkedin") {
+      var openLink = el.closest("td").querySelector("a.icon-btn");
+      if (openLink) {
+        if (el.value) { openLink.style.opacity = ""; openLink.style.pointerEvents = ""; openLink.href = normalizeUrl(el.value); }
+        else { openLink.style.opacity = "0.35"; openLink.style.pointerEvents = "none"; }
+      }
+    }
+  });
+
+  async function deleteContactFromTable(cid) {
+    if (!(await askConfirm("Delete this contact? This can't be undone.", "Delete"))) return;
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
     renderTable();
   }
+
+  document.getElementById("add-contact-standalone").addEventListener("click", function () {
+    var c = blankContact();
+    state.contacts.push(c);
+    saveContact(c, true);
+    renderTable();
+    openContactDrawer(c.id);
+  });
 
   function findJob(id) {
     for (var i = 0; i < state.jobs.length; i++) if (state.jobs[i].id === id) return state.jobs[i];
@@ -1936,30 +2089,38 @@
   });
 
   // ---------- Contact detail drawer (Contacts tab) ----------
+  // Contacts are top-level now (state.contacts), same as jobs — a contact may or may
+  // not have a jobId linking it to a job record.
   var cdScrim = document.getElementById("cd-scrim");
   var cdDrawer = document.getElementById("cd-drawer");
   var cdCompanyLink = document.getElementById("cd-company-link");
   var CD_FIELDS = ["phone", "email", "linkedin", "dateOfContact"];
-  var cdActive = { jobId: null, cid: null };
+  var cdActiveId = null;
 
-  function findContact(jobId, cid) {
-    var job = findJob(jobId);
-    if (!job) return null;
-    var c = (job.contacts || []).find(function (x) { return x.id === cid; });
-    return c ? { job: job, contact: c } : null;
+  function findContact(cid) {
+    return state.contacts.find(function (c) { return c.id === cid; }) || null;
   }
 
-  function openContactDrawer(jobId, cid) {
-    var found = findContact(jobId, cid);
-    if (!found) return;
-    cdActive = { jobId: jobId, cid: cid };
-    document.getElementById("cd-name").value = found.contact.name || "";
-    document.getElementById("cd-connection").value = found.contact.connection || "";
+  function openContactDrawer(cid) {
+    var c = findContact(cid);
+    if (!c) return;
+    cdActiveId = cid;
+    document.getElementById("cd-name").value = c.name || "";
+    document.getElementById("cd-connection").value = c.connection || "";
     CD_FIELDS.forEach(function (f) {
-      document.getElementById("cd-" + f).value = found.contact[f] || "";
+      document.getElementById("cd-" + f).value = c[f] || "";
     });
-    document.getElementById("cd-notes").value = found.contact.notes || "";
-    cdCompanyLink.textContent = (found.job.company || found.job.position || "Untitled job") + " — open job record ↗";
+    document.getElementById("cd-notes").value = c.notes || "";
+    var job = c.jobId ? findJob(c.jobId) : null;
+    if (job) {
+      cdCompanyLink.textContent = (job.company || job.position || "Untitled job") + " — open job record ↗";
+      cdCompanyLink.style.cursor = "pointer";
+      cdCompanyLink.style.color = "var(--accent)";
+    } else {
+      cdCompanyLink.textContent = "Not linked to a job";
+      cdCompanyLink.style.cursor = "default";
+      cdCompanyLink.style.color = "var(--ink-faint)";
+    }
     cdDrawer.classList.add("open");
     cdDrawer.setAttribute("aria-hidden", "false");
     cdScrim.classList.add("open");
@@ -1970,7 +2131,7 @@
     cdDrawer.classList.remove("open");
     cdDrawer.setAttribute("aria-hidden", "true");
     cdScrim.classList.remove("open");
-    cdActive = { jobId: null, cid: null };
+    cdActiveId = null;
     renderTable();
   }
 
@@ -1981,18 +2142,18 @@
   });
 
   cdCompanyLink.addEventListener("click", function () {
-    if (!cdActive.jobId) return;
-    var jobId = cdActive.jobId;
+    var c = findContact(cdActiveId);
+    if (!c || !c.jobId) return;
+    var jobId = c.jobId;
     closeContactDrawer();
     openDrawer(jobId);
   });
 
   function saveActiveContactField(field, value) {
-    if (!cdActive.cid) return;
-    var found = findContact(cdActive.jobId, cdActive.cid);
-    if (!found) return;
-    found.contact[field] = value;
-    save(found.job, true);
+    var c = findContact(cdActiveId);
+    if (!c) return;
+    c[field] = value;
+    saveContact(c, false);
   }
 
   document.getElementById("cd-name").addEventListener("input", function (e) { saveActiveContactField("name", e.target.value); });
@@ -2003,13 +2164,12 @@
   });
 
   document.getElementById("cd-delete").addEventListener("click", async function () {
-    if (!cdActive.cid) return;
+    if (!cdActiveId) return;
     if (!(await askConfirm("Delete this contact? This can't be undone.", "Delete"))) return;
-    var job = findJob(cdActive.jobId);
-    if (job) {
-      job.contacts = (job.contacts || []).filter(function (c) { return c.id !== cdActive.cid; });
-      save(job, true);
-    }
+    var cid = cdActiveId;
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
     closeContactDrawer();
   });
 
@@ -2170,13 +2330,17 @@
   });
 
   // ---------- Contacts ----------
+  function contactsForJob(jobId) {
+    return state.contacts.filter(function (c) { return c.jobId === jobId; });
+  }
+
   function renderContacts(job) {
-    if (!Array.isArray(job.contacts)) job.contacts = [];
     var list = document.getElementById("contacts-list");
-    if (!job.contacts.length) {
+    var jobContacts = contactsForJob(job.id);
+    if (!jobContacts.length) {
       list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
     } else {
-      list.innerHTML = job.contacts.map(function (c) {
+      list.innerHTML = jobContacts.map(function (c) {
         return '<div class="card" data-cid="' + c.id + '">' +
           '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
           '<div class="card-grid">' +
@@ -2202,9 +2366,10 @@
   document.getElementById("add-contact").addEventListener("click", function () {
     var job = findJob(state.activeId);
     if (!job) return;
-    if (!Array.isArray(job.contacts)) job.contacts = [];
-    job.contacts.push({ id: uid(), name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "" });
-    save(job, true);
+    var c = blankContact();
+    c.jobId = job.id;
+    state.contacts.push(c);
+    saveContact(c, true);
     renderContacts(job);
     // The new card can land below the fold in a long drawer — bring it into view so
     // adding one doesn't look like nothing happened.
@@ -2216,10 +2381,8 @@
     var el = e.target;
     var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
     if (!cid || !field) return;
-    var job = findJob(state.activeId);
-    if (!job) return;
-    var c = job.contacts.find(function (x) { return x.id === cid; });
-    if (c) { c[field] = el.value; save(job); }
+    var c = findContact(cid);
+    if (c) { c[field] = el.value; saveContact(c, false); }
   });
 
   document.getElementById("contacts-list").addEventListener("click", async function (e) {
@@ -2228,8 +2391,10 @@
     if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
     var job = findJob(state.activeId);
     if (!job) return;
-    job.contacts = job.contacts.filter(function (c) { return c.id !== btn.getAttribute("data-cid"); });
-    save(job, true);
+    var cid = btn.getAttribute("data-cid");
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
     renderContacts(job);
   });
 
@@ -2293,9 +2458,9 @@
 
   // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
   window.addEventListener("storage", function (e) {
-    if (e.key !== STORAGE_KEY || state.activeId || cdActive.cid) return;
-    state.jobs = load();
-    renderTable();
+    if (state.activeId || cdActiveId) return;
+    if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
+    else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
   });
 
   renderTable();
