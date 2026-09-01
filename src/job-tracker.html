@@ -276,8 +276,8 @@
   }
 
   table {
-    border-collapse: collapse;
-    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
     min-width: 980px;
     table-layout: fixed;
   }
@@ -784,6 +784,7 @@
     </div>
     <div class="sheet-scroll">
       <table id="table">
+        <colgroup id="colgroup"></colgroup>
         <thead><tr id="thead-row"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -1245,6 +1246,7 @@
   state.colWidths = loadColWidths();
 
   // ---------- Column definitions per stage ----------
+  var ACTIONS_COL_WIDTH = 224;
   var BASE_COLS = [
     { key: "date", label: "Date", type: "date", w: "112px" },
     { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
@@ -1319,18 +1321,23 @@
   // Widths persist per-device (localStorage) — a layout preference, not tracker data,
   // so it isn't part of the synced job records.
   var MIN_COL_WIDTH = 60;
-  var resizeDrag = null; // { key, th, startX, startWidth }
+  var resizeDrag = null; // { key, col, startX, startWidth }
 
   document.getElementById("thead-row").addEventListener("mousedown", function (e) {
     var handle = e.target.closest(".col-resizer");
     if (!handle) return;
     e.preventDefault();
-    var th = handle.closest("th");
+    var key = handle.getAttribute("data-key");
+    var col = document.querySelector('#colgroup col[data-key="' + key + '"]');
+    if (!col) return;
+    var table = document.getElementById("table");
     resizeDrag = {
-      key: handle.getAttribute("data-key"),
-      th: th,
+      key: key,
+      col: col,
+      table: table,
       startX: e.clientX,
-      startWidth: th.getBoundingClientRect().width
+      startWidth: handle.closest("th").getBoundingClientRect().width,
+      startTableWidth: table.getBoundingClientRect().width
     };
     handle.classList.add("dragging");
     document.body.classList.add("col-resizing");
@@ -1338,13 +1345,19 @@
 
   document.addEventListener("mousemove", function (e) {
     if (!resizeDrag) return;
-    var next = Math.max(MIN_COL_WIDTH, Math.round(resizeDrag.startWidth + (e.clientX - resizeDrag.startX)));
-    resizeDrag.th.style.width = next + "px";
+    var delta = e.clientX - resizeDrag.startX;
+    var next = Math.max(MIN_COL_WIDTH, Math.round(resizeDrag.startWidth + delta));
+    var appliedDelta = next - resizeDrag.startWidth;
+    resizeDrag.col.style.width = next + "px";
+    // Chromium (and others) won't re-run the fixed-table-layout algorithm from a
+    // <colgroup> width change alone — nudging the table's own width in lockstep is
+    // what actually forces the column to visibly resize.
+    resizeDrag.table.style.width = (resizeDrag.startTableWidth + appliedDelta) + "px";
   });
 
   document.addEventListener("mouseup", function () {
     if (!resizeDrag) return;
-    var finalWidth = parseInt(resizeDrag.th.style.width, 10);
+    var finalWidth = parseInt(resizeDrag.col.style.width, 10);
     state.colWidths[resizeDrag.key] = finalWidth;
     saveColWidths();
     document.querySelectorAll(".col-resizer.dragging").forEach(function (el) { el.classList.remove("dragging"); });
@@ -1466,15 +1479,29 @@
       rows = rows.slice().sort(function (a, b) { return compareJobs(a, b, sortCol, state.sortDir); });
     }
 
+    // <colgroup> drives the actual column widths under table-layout:fixed — it's the
+    // mechanism browsers reliably re-layout when a width changes after initial render;
+    // relying on <th> cell widths alone left drag-resize updating the inline style
+    // without ever visibly reflowing the columns.
+    var colgroup = document.getElementById("colgroup");
+    var totalW = ACTIONS_COL_WIDTH;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + ACTIONS_COL_WIDTH + 'px">' + cols.map(function (c) {
+      var w = state.colWidths[c.key] || parseInt(c.w, 10);
+      totalW += w;
+      return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
+    }).join("");
+    // Table needs an explicit width matching the columns (see the resize handler for why) —
+    // min-width still lets it look reasonable on wide screens with just a few columns.
+    document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
+
     var thead = document.getElementById("thead-row");
-    var actionsW = state.colWidths.actions || 180;
-    thead.innerHTML = '<th class="actions-col" style="width:' + actionsW + 'px">Actions' +
-      '<span class="col-resizer" data-key="actions"></span></th>' + cols.map(function (c) {
+    // Fixed, not resizable — it always needs to fit its buttons exactly (the longest
+    // combination across stages is "← Applied" + "Rejected →" plus the two icon buttons).
+    thead.innerHTML = '<th class="actions-col">Actions</th>' + cols.map(function (c) {
       var active = sortCol && sortCol.key === c.key;
       var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
-      var w = state.colWidths[c.key] || parseInt(c.w, 10);
       return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key +
-        '" tabindex="0" style="width:' + w + 'px">' + c.label + '<span class="arrow">' + arrow + "</span>" +
+        '" tabindex="0">' + c.label + '<span class="arrow">' + arrow + "</span>" +
         '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
     }).join("");
 
