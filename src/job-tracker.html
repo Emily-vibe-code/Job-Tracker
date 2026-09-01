@@ -911,7 +911,7 @@
   state.jobs = load();
 
   // ---------- Column definitions per stage ----------
-  var COLS_JOBS = [
+  var BASE_COLS = [
     { key: "date", label: "Date", type: "date", w: "112px" },
     { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
     { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" },
@@ -923,14 +923,16 @@
     { key: "pto", label: "PTO", type: "text", w: "120px" },
     { key: "medical", label: "Medical", type: "text", w: "140px" }
   ];
-  var COLS_APPLIED = COLS_JOBS.concat([
-    { key: "dateApplied", label: "Date applied", type: "date", w: "116px" },
-    { key: "whereApplied", label: "Where applied", type: "text", w: "140px" },
-    { key: "interviewing", label: "Interviewing", type: "checkbox", w: "96px" }
-  ]);
-  var COLS_REJECTED = COLS_APPLIED.concat([
-    { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" }
-  ]);
+  // Shared so entering a value moves the record forward from any tab that shows it
+  // (Jobs, Applied, Interviewing, Rejected) — see applyDateAppliedAutoMove / applyInterviewingToggle.
+  var COL_DATE_APPLIED = { key: "dateApplied", label: "Date applied", type: "date", w: "116px" };
+  var COL_WHERE_APPLIED = { key: "whereApplied", label: "Where applied", type: "text", w: "140px" };
+  var COL_INTERVIEWING = { key: "interviewing", label: "Interviewing", type: "checkbox", w: "96px" };
+  var COL_DATE_REJECTED = { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" };
+
+  var COLS_JOBS = BASE_COLS.concat([COL_DATE_APPLIED, COL_INTERVIEWING]);
+  var COLS_APPLIED = BASE_COLS.concat([COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING]);
+  var COLS_REJECTED = COLS_APPLIED.concat([COL_DATE_REJECTED]);
   var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, interviewing: COLS_APPLIED, rejected: COLS_REJECTED };
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
 
@@ -1152,12 +1154,29 @@
   // Checking "Interviewing" while a row is in Applied moves it to the Interviewing tab;
   // unchecking it while in Interviewing moves it back to Applied. Shared by the main
   // sheet and the drawer.
+  // Checking "Interviewing" moves the record to the Interviewing tab from wherever it
+  // currently is (Jobs, Applied, or Rejected); unchecking it moves it back to Applied.
   function applyInterviewingToggle(job, checked) {
     job.interviewing = checked;
     var moved = false;
-    if (checked && job.stage === "applied") { job.stage = "interviewing"; moved = true; }
-    else if (!checked && job.stage === "interviewing") { job.stage = "applied"; moved = true; }
+    if (checked && job.stage !== "interviewing") {
+      job.stage = "interviewing";
+      if (!job.dateApplied) job.dateApplied = todayStr();
+      moved = true;
+    } else if (!checked && job.stage === "interviewing") {
+      job.stage = "applied";
+      moved = true;
+    }
     return moved;
+  }
+
+  // Filling in "Date applied" while still in Jobs moves the record to Applied.
+  function applyDateAppliedAutoMove(job) {
+    if (job.dateApplied && job.stage === "jobs") {
+      job.stage = "applied";
+      return true;
+    }
+    return false;
   }
 
   // Delegated input/change handling for inline editing (avoids full re-render per keystroke)
@@ -1184,6 +1203,10 @@
       var moved = applyInterviewingToggle(job, el.checked);
       save(job, true);
       if (moved) { renderTable(); return; }
+    } else if (job && field === "dateApplied") {
+      var movedDate = applyDateAppliedAutoMove(job);
+      save(job, true);
+      if (movedDate) { renderTable(); return; }
     }
     renderStats();
   });
@@ -1311,7 +1334,15 @@
   }, true);
   document.getElementById("drawer").addEventListener("change", function (e) {
     var job = state.activeId && findJob(state.activeId);
-    if (job && (e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
+    if (!job) return;
+    if (e.target.id === "d-dateApplied") {
+      var moved = applyDateAppliedAutoMove(job);
+      updateStageBadge(job);
+      save(job, true);
+      if (moved) renderTable();
+      return;
+    }
+    if ((e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
       save(job, true);
     }
   });
