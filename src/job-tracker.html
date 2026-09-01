@@ -983,6 +983,12 @@
       if (data && data[k] !== undefined) j[k] = data[k];
     });
     if (data && data.id) j.id = data.id;
+    // The cloud store round-trips through JSON; guard against contacts/interviews/
+    // followups coming back as anything but an array (e.g. an empty-array quirk in the
+    // underlying store), which would otherwise make every "+ Add" button silently throw.
+    if (!Array.isArray(j.contacts)) j.contacts = [];
+    if (!Array.isArray(j.interviews)) j.interviews = [];
+    if (!Array.isArray(j.followups)) j.followups = [];
     return j;
   }
 
@@ -1879,6 +1885,7 @@
 
   // ---------- Contacts ----------
   function renderContacts(job) {
+    if (!Array.isArray(job.contacts)) job.contacts = [];
     var list = document.getElementById("contacts-list");
     if (!job.contacts.length) {
       list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
@@ -1905,6 +1912,7 @@
   document.getElementById("add-contact").addEventListener("click", function () {
     var job = findJob(state.activeId);
     if (!job) return;
+    if (!Array.isArray(job.contacts)) job.contacts = [];
     job.contacts.push({ id: uid(), name: "", phone: "", email: "", linkedin: "" });
     save(job, true);
     renderContacts(job);
@@ -1933,6 +1941,7 @@
 
   // ---------- Interviews & follow-ups (shared logic) ----------
   function renderEntries(job, key, listId) {
+    if (!Array.isArray(job[key])) job[key] = [];
     var list = document.getElementById(listId);
     var entries = job[key];
     if (!entries.length) {
@@ -1955,6 +1964,7 @@
     document.getElementById(addBtnId).addEventListener("click", function () {
       var job = findJob(state.activeId);
       if (!job) return;
+      if (!Array.isArray(job[key])) job[key] = [];
       job[key].push({ id: uid(), date: "", notes: "" });
       save(job, true);
       renderEntries(job, key, listId);
