@@ -1033,11 +1033,15 @@
     jobsCol = dbApi.collection("jobs");
     try {
       var snap = await jobsCol.orderBy("createdAt").get();
-      if (!snap.empty) {
+      // If a drawer is already open by the time this resolves (e.g. the viewer opened
+      // a just-created job within the first moment of page load, before this fetch
+      // landed), applying this snapshot could silently wipe that job out of state.jobs —
+      // same race the live listener below already guards against.
+      if (!snap.empty && !state.activeId) {
         state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
         localSave();
         renderTable();
-      } else if (state.jobs.length) {
+      } else if (snap.empty && state.jobs.length) {
         state.jobs.forEach(function (j) { save(j, true); });
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
@@ -1916,6 +1920,10 @@
     job.contacts.push({ id: uid(), name: "", phone: "", email: "", linkedin: "" });
     save(job, true);
     renderContacts(job);
+    // The new card can land below the fold in a long drawer — bring it into view so
+    // adding one doesn't look like nothing happened.
+    var newCard = document.querySelector("#contacts-list .card:last-child");
+    if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 
   document.getElementById("contacts-list").addEventListener("input", function (e) {
@@ -1968,6 +1976,8 @@
       job[key].push({ id: uid(), date: "", notes: "" });
       save(job, true);
       renderEntries(job, key, listId);
+      var newCard = document.querySelector("#" + listId + " .card:last-child");
+      if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
     var list = document.getElementById(listId);
     list.addEventListener("input", function (e) {
