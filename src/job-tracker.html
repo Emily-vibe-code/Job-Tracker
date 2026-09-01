@@ -1703,6 +1703,12 @@
 
   function fmt(v) { return v === undefined || v === null ? "" : v; }
 
+  // Browser spellcheck/autofill suggestions popping up over a spreadsheet-style grid of
+  // same-shaped inputs is a known way to steal focus mid-keystroke — e.g. typing a "-"
+  // or a word into a field the browser doesn't recognize as a real form field. Every
+  // inline table cell opts out.
+  var NO_ASSIST_ATTRS = ' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"';
+
   function escapeHtml(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -1746,7 +1752,8 @@
     if (col.max !== undefined) extra += ' max="' + col.max + '"';
     if (col.step !== undefined) extra += ' step="' + col.step + '"';
     var cls = col.key === "reviewPercent" && isLowRating(v) ? ' class="low-rating"' : "";
-    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key + '"' + cls + extra + '>';
+    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
+      '"' + cls + extra + NO_ASSIST_ATTRS + '>';
   }
 
   function isLowRating(v) {
@@ -1977,13 +1984,13 @@
         : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
       return '<tr data-cid="' + c.id + '">' +
         '<td class="actions-col"><div class="row-actions">' + contactActionsInnerHtml(c.id) + "</div></td>" +
-        '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"></td>' +
-        '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"></td>' +
-        '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"></td>' +
-        '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"></td>' +
+        '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="cell-text">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
-        '<td class="linkedin-cell"><div class="linkedin-inner"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin">' + linkedinOpen + "</div></td>" +
+        '<td class="linkedin-cell"><div class="linkedin-inner"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + ">" + linkedinOpen + "</div></td>" +
         "</tr>";
     }).join("");
   }
