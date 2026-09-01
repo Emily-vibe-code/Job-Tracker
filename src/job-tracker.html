@@ -663,6 +663,21 @@
   .sync-status.on .dot { background: var(--success); }
   .sync-status.off .dot { background: var(--warn); }
 
+  .export-link {
+    border: none;
+    background: none;
+    color: var(--ink-faint);
+    font: inherit;
+    font-size: 0.72rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 2px;
+  }
+  .export-link:hover { color: var(--accent); }
+  .export-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -675,7 +690,7 @@
   <header class="topbar">
     <div>
       <h1>Job Tracker</h1>
-      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span></div>
+      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span> <button type="button" id="export-btn" class="export-link">Export backup</button></div>
     </div>
     <div class="stats" id="stats"></div>
   </header>
@@ -894,6 +909,49 @@
 
     setSyncStatus("on", "Synced to your account");
   }
+
+  // ---------- Export backup ----------
+  // Extra insurance beyond cloud sync: a manual, viewer-initiated download of everything,
+  // as a plain JSON file the viewer keeps for themselves.
+  var hasClaudeRuntime = !!(window.claude && typeof window.claude.use === "function");
+  var downloadsApi = null;
+  var exportBtn = document.getElementById("export-btn");
+
+  async function initExport() {
+    if (!hasClaudeRuntime) return; // plain browser tab: the blob fallback below just works
+    try { downloadsApi = await window.claude.use("downloads"); } catch (e) { downloadsApi = null; }
+    if (!downloadsApi) exportBtn.style.display = "none";
+  }
+
+  async function exportBackup() {
+    var payload = JSON.stringify({ exportedAt: new Date().toISOString(), jobs: state.jobs }, null, 2);
+    var filename = "job-tracker-backup-" + todayStr() + ".json";
+    var originalLabel = exportBtn.textContent;
+
+    if (downloadsApi) {
+      try {
+        await downloadsApi.save({ filename: filename, data: payload });
+        exportBtn.textContent = "Backup saved";
+        setTimeout(function () { exportBtn.textContent = originalLabel; }, 2000);
+      } catch (e) {
+        if (!e || e.code !== "declined") alert("Couldn't save the backup just now — try again in a moment.");
+      }
+      return;
+    }
+    if (hasClaudeRuntime) return; // capability unavailable; button is hidden, this is just a safeguard
+
+    var blob = new Blob([payload], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  exportBtn.addEventListener("click", exportBackup);
 
   function blankJob() {
     return {
@@ -1464,6 +1522,7 @@
 
   renderTable();
   initCloudSync();
+  initExport();
 })();
 </script>
 
