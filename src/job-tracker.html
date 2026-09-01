@@ -1039,6 +1039,16 @@
     return !!(el && el.closest && el.closest("#tbody"));
   }
 
+  // The single source of truth for "is it safe to let an incoming cloud sync snapshot
+  // replace local state right now?" Covers every way local data can be ahead of what the
+  // server has confirmed: a drawer open, a cell focused, or a write still scheduled/in
+  // flight. Closing a drawer or blurring a cell doesn't by itself mean the write landed —
+  // only flushPendingWrites()/flushPendingContactWrites() finishing does — so the pending/
+  // in-flight checks are what actually close the "edit, close, get reverted" race.
+  function isSyncSensitive() {
+    return !!(state.activeId || cdActiveId || isEditingInline() || hasPendingJobWrites() || hasPendingContactWrites());
+  }
+
   function loadColWidths() {
     try {
       var raw = localStorage.getItem(COLWIDTH_KEY);
@@ -1079,6 +1089,8 @@
   var dbApi = null;
   var jobsCol = null;
   var writeTimers = {};
+  var pendingWrites = {};   // id -> the write fn, so a debounced write can be flushed early
+  var inFlightWrites = {};  // id -> true while its .set() call is outstanding
   var syncStatusEl = document.getElementById("sync-status");
   var syncStatusText = document.getElementById("sync-status-text");
 
@@ -1115,12 +1127,34 @@
     var body = cloneJob(job);
     var doWrite = function () {
       delete writeTimers[id];
-      jobsCol.doc(id).set(body).catch(function () {
-        setSyncStatus("off", "Sync paused — changes are saved on this device");
-      });
+      delete pendingWrites[id];
+      inFlightWrites[id] = true;
+      jobsCol.doc(id).set(body)
+        .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
+        .finally(function () { delete inFlightWrites[id]; });
     };
-    if (immediate) doWrite();
-    else writeTimers[id] = setTimeout(doWrite, 500);
+    if (immediate) { doWrite(); }
+    else { pendingWrites[id] = doWrite; writeTimers[id] = setTimeout(doWrite, 500); }
+  }
+
+  // Sends any still-debounced job writes right now instead of waiting out their timer —
+  // called when a place a viewer could edit from (the drawer, an inline cell) stops being
+  // actively edited, so a save is never left pending once nothing protects it anymore.
+  function flushPendingWrites() {
+    Object.keys(pendingWrites).forEach(function (id) {
+      var fn = pendingWrites[id];
+      clearTimeout(writeTimers[id]);
+      delete writeTimers[id];
+      delete pendingWrites[id];
+      fn();
+    });
+  }
+
+  // True while any job write is scheduled, in flight, or (via the contacts counterparts
+  // defined below) the same for a contact — a cloud sync delivery arriving in that window
+  // could be stale relative to it, so callers must not let it overwrite local state.
+  function hasPendingJobWrites() {
+    return Object.keys(writeTimers).length > 0 || Object.keys(inFlightWrites).length > 0;
   }
 
   function deleteFromDb(id) {
@@ -1154,7 +1188,7 @@
       // landed), applying this snapshot could silently wipe that job out of state.jobs —
       // same race the live listener below already guards against. Also true while a
       // contact's own drawer is open, since that edits a job object too.
-      if (!snap.empty && !state.activeId && !cdActiveId && !isEditingInline()) {
+      if (!snap.empty && !isSyncSensitive()) {
         state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
         localSave();
         renderTable();
@@ -1165,7 +1199,7 @@
 
     try {
       var cSnap = await contactsCol.orderBy("createdAt").get();
-      if (!cSnap.empty && !state.activeId && !cdActiveId && !isEditingInline()) {
+      if (!cSnap.empty && !isSyncSensitive()) {
         state.contacts = cSnap.docs.map(function (d) { return normalizeContact(d.data()); });
         localSaveContacts();
         renderTable();
@@ -1176,7 +1210,7 @@
     migrateEmbeddedContacts();
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId || cdActiveId || isEditingInline()) return; // don't clobber an in-progress edit
+      if (isSyncSensitive()) return; // don't clobber an in-progress (or not-yet-confirmed) edit
       var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
       state.jobs = jobs;
       localSave();
@@ -1187,7 +1221,7 @@
     });
 
     contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId || cdActiveId || isEditingInline()) return;
+      if (isSyncSensitive()) return;
       state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
       localSaveContacts();
       renderTable();
@@ -1411,6 +1445,8 @@
   var CONTACTS_STORAGE_KEY = "jobTrackerContacts.v1";
   var contactsCol = null;
   var contactWriteTimers = {};
+  var pendingContactWrites = {};
+  var inFlightContactWrites = {};
 
   function blankContact() {
     return {
@@ -1458,11 +1494,28 @@
     var body = JSON.parse(JSON.stringify(contact));
     var doWrite = function () {
       delete contactWriteTimers[id];
-      contactsCol.doc(id).set(body).catch(function () {
-        setSyncStatus("off", "Sync paused — changes are saved on this device");
-      });
+      delete pendingContactWrites[id];
+      inFlightContactWrites[id] = true;
+      contactsCol.doc(id).set(body)
+        .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
+        .finally(function () { delete inFlightContactWrites[id]; });
     };
-    if (immediate) doWrite(); else contactWriteTimers[id] = setTimeout(doWrite, 500);
+    if (immediate) { doWrite(); }
+    else { pendingContactWrites[id] = doWrite; contactWriteTimers[id] = setTimeout(doWrite, 500); }
+  }
+
+  function flushPendingContactWrites() {
+    Object.keys(pendingContactWrites).forEach(function (id) {
+      var fn = pendingContactWrites[id];
+      clearTimeout(contactWriteTimers[id]);
+      delete contactWriteTimers[id];
+      delete pendingContactWrites[id];
+      fn();
+    });
+  }
+
+  function hasPendingContactWrites() {
+    return Object.keys(contactWriteTimers).length > 0 || Object.keys(inFlightContactWrites).length > 0;
   }
 
   function deleteContactFromDb(id) {
@@ -2030,6 +2083,15 @@
     if (row) openContactDrawer(row.getAttribute("data-cid"));
   });
 
+  // Mirrors the drawer-close flush: the moment a cell stops being edited, send its
+  // pending write immediately rather than leaving it debounced — isEditingInline()'s
+  // protection lifts the instant focus leaves, so any write still queued past that point
+  // is exposed to being overwritten by a sync delivery that hasn't seen it yet.
+  document.getElementById("tbody").addEventListener("focusout", function () {
+    flushPendingWrites();
+    flushPendingContactWrites();
+  });
+
   document.getElementById("tbody").addEventListener("input", function (e) {
     var el = e.target;
     var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
@@ -2215,6 +2277,7 @@
     drawer.classList.remove("open");
     drawer.setAttribute("aria-hidden", "true");
     scrim.classList.remove("open");
+    flushPendingWrites();
     state.activeId = null;
     renderTable();
   }
@@ -2274,6 +2337,7 @@
     cdDrawer.classList.remove("open");
     cdDrawer.setAttribute("aria-hidden", "true");
     cdScrim.classList.remove("open");
+    flushPendingContactWrites();
     cdActiveId = null;
     renderTable();
   }
@@ -2602,7 +2666,7 @@
 
   // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
   window.addEventListener("storage", function (e) {
-    if (state.activeId || cdActiveId || isEditingInline()) return;
+    if (isSyncSensitive()) return;
     if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
   });
