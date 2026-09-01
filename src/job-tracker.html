@@ -1388,8 +1388,24 @@
   function blankContact() {
     return {
       id: uid(), jobId: null, createdAt: Date.now(),
-      name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: ""
+      name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
+      // Snapshot of the linked job's company name. Kept in sync with the live job
+      // (see syncContactCompany) while it exists, so the name survives if that job is
+      // ever deleted instead of just vanishing along with it.
+      company: ""
     };
+  }
+
+  // Refreshes a contact's company snapshot from its linked job, if any, and reports
+  // whether it changed (so callers only persist when something actually moved).
+  function syncContactCompany(c) {
+    if (!c.jobId) return false;
+    var job = findJob(c.jobId);
+    if (!job) return false;
+    var name = job.company || "";
+    if (c.company === name) return false;
+    c.company = name;
+    return true;
   }
 
   function loadContacts() {
@@ -1874,9 +1890,12 @@
 
     tbody.innerHTML = entries.map(function (c) {
       var job = c.jobId ? findJob(c.jobId) : null;
+      if (syncContactCompany(c)) saveContact(c, false);
       var companyCell = job
         ? '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.company || job.position || "Untitled job") + "</button>"
-        : '<span style="color:var(--ink-faint);">—</span>';
+        : (c.company
+          ? '<span style="color:var(--ink-faint);" title="The linked job was deleted">' + escapeHtml(c.company) + "</span>"
+          : '<span style="color:var(--ink-faint);">—</span>');
       var esc = function (v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); };
       var linkedinOpen = c.linkedin
         ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
@@ -2128,10 +2147,15 @@
     });
     document.getElementById("cd-notes").value = c.notes || "";
     var job = c.jobId ? findJob(c.jobId) : null;
+    if (syncContactCompany(c)) saveContact(c, false);
     if (job) {
       cdCompanyLink.textContent = (job.company || job.position || "Untitled job") + " — open job record ↗";
       cdCompanyLink.style.cursor = "pointer";
       cdCompanyLink.style.color = "var(--accent)";
+    } else if (c.company) {
+      cdCompanyLink.textContent = c.company + " (job deleted)";
+      cdCompanyLink.style.cursor = "default";
+      cdCompanyLink.style.color = "var(--ink-faint)";
     } else {
       cdCompanyLink.textContent = "Not linked to a job";
       cdCompanyLink.style.cursor = "default";
@@ -2384,6 +2408,7 @@
     if (!job) return;
     var c = blankContact();
     c.jobId = job.id;
+    c.company = job.company || "";
     state.contacts.push(c);
     saveContact(c, true);
     renderContacts(job);
