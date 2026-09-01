@@ -439,6 +439,35 @@
     white-space: nowrap;
   }
 
+  /* Contacts tab: plain read-only cells (no <input>, so they need their own padding)
+     plus in-app "link" buttons that behave like <a> but open a drawer instead of a URL. */
+  .cell-text {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cell-text a { color: var(--accent); text-decoration: none; }
+  .cell-text a:hover { text-decoration: underline; }
+  .link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.82rem;
+    color: var(--accent);
+    cursor: pointer;
+    text-align: left;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-btn:hover { text-decoration: underline; }
+  .link-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
   .icon-btn {
     border: 1px solid var(--border);
     background: var(--surface);
@@ -784,6 +813,7 @@
     <button class="tab" role="tab" data-stage="applied" aria-selected="false">Applied <span class="count" id="count-applied">0</span></button>
     <button class="tab" role="tab" data-stage="interviewing" aria-selected="false">Interviewing <span class="count" id="count-interviewing">0</span></button>
     <button class="tab" role="tab" data-stage="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
+    <button class="tab" role="tab" data-stage="contacts" aria-selected="false">Contacts <span class="count" id="count-contacts">0</span></button>
   </nav>
 
   <div class="sheet">
@@ -802,9 +832,12 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
-    <div class="add-row">
+    <div class="add-row" id="add-row">
       <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
       <button class="btn" id="paste-btn" type="button">+ Paste from bookmarklet</button>
+    </div>
+    <div class="add-row" id="contacts-hint" style="display:none;">
+      <span class="bookmarklet-hint">Contacts are added from a job's detail view — open a job, then "+ Add contact."</span>
     </div>
   </div>
 </div>
@@ -879,6 +912,40 @@
   <div class="drawer-foot">
     <span class="stage-badge" id="d-stage-badge">Jobs</span>
     <button class="icon-btn danger" id="d-delete" type="button" aria-label="Delete record" title="Delete record">🗑</button>
+  </div>
+</aside>
+
+<div class="scrim" id="cd-scrim"></div>
+<aside class="drawer" id="cd-drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="titles">
+      <input type="text" id="cd-name" class="position" placeholder="Contact name" aria-label="Contact name">
+      <input type="text" id="cd-connection" class="company" placeholder="Connection (e.g. Recruiter, Referral)" aria-label="Connection">
+    </div>
+    <button class="icon-btn" id="cd-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="section">
+      <p class="section-title">Contact details</p>
+      <div class="field-grid">
+        <div class="field"><label for="cd-phone">Phone number</label><input type="tel" id="cd-phone" placeholder="e.g. (555) 123-4567"></div>
+        <div class="field"><label for="cd-email">Email address</label><input type="email" id="cd-email" placeholder="name@company.com"></div>
+        <div class="field"><label for="cd-linkedin">LinkedIn</label><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."></div>
+        <div class="field"><label for="cd-dateOfContact">Date of contact</label><input type="date" id="cd-dateOfContact"></div>
+        <div class="field span-2">
+          <label>Company</label>
+          <button type="button" class="btn" id="cd-company-link" style="width:100%; justify-content:flex-start;"></button>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <p class="section-title">Notes</p>
+      <textarea id="cd-notes" style="width:100%; min-height:120px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Anything worth remembering about this contact"></textarea>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <span class="stage-badge stage-applied">Contact</span>
+    <button class="icon-btn danger" id="cd-delete" type="button" aria-label="Delete contact" title="Delete contact">🗑</button>
   </div>
 </aside>
 
@@ -1036,8 +1103,9 @@
       // If a drawer is already open by the time this resolves (e.g. the viewer opened
       // a just-created job within the first moment of page load, before this fetch
       // landed), applying this snapshot could silently wipe that job out of state.jobs —
-      // same race the live listener below already guards against.
-      if (!snap.empty && !state.activeId) {
+      // same race the live listener below already guards against. Also true while a
+      // contact's own drawer is open, since that edits a job object too.
+      if (!snap.empty && !state.activeId && !cdActive.cid) {
         state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
         localSave();
         renderTable();
@@ -1047,7 +1115,7 @@
     } catch (e) { /* keep whatever loaded from localStorage */ }
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
-      if (state.activeId) return; // don't clobber an in-progress edit in the drawer
+      if (state.activeId || cdActive.cid) return; // don't clobber an in-progress edit
       var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
       state.jobs = jobs;
       localSave();
@@ -1434,6 +1502,7 @@
     document.getElementById("count-applied").textContent = applied;
     document.getElementById("count-interviewing").textContent = interviewing;
     document.getElementById("count-rejected").textContent = rejected;
+    document.getElementById("count-contacts").textContent = getAllContacts().length;
   }
 
   function cellHtml(job, col) {
@@ -1488,6 +1557,13 @@
   function renderTable() {
     renderStats();
     var stage = state.activeStage;
+
+    document.getElementById("add-row").style.display = stage === "contacts" ? "none" : "flex";
+    document.getElementById("contacts-hint").style.display = stage === "contacts" ? "flex" : "none";
+    document.getElementById("search-input").placeholder = stage === "contacts" ? "Search by name or company" : "Search by company name";
+
+    if (stage === "contacts") { renderContactsTab(); return; }
+
     var cols = STAGE_COLS[stage];
     var rows = state.jobs.filter(function (j) { return j.stage === stage; });
 
@@ -1570,6 +1646,134 @@
         '<button class="icon-btn danger" data-action="delete" data-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
         "</div></td>" + cells + "</tr>";
     }).join("");
+  }
+
+  // ---------- Contacts tab ----------
+  // Flattens every contact across every job into one sortable/searchable sheet, with
+  // Company/LinkedIn as clickable links instead of editable cells (editing still happens
+  // in the owning job's drawer, or this contact's own drawer).
+  var CONTACT_COLS = [
+    { key: "name", label: "Name", w: "150px" },
+    { key: "connection", label: "Connection", w: "130px" },
+    { key: "phone", label: "Phone number", w: "140px" },
+    { key: "email", label: "Email address", w: "190px" },
+    { key: "company", label: "Company", w: "160px" },
+    { key: "dateOfContact", label: "Date of contact", w: "130px" },
+    { key: "linkedin", label: "LinkedIn", w: "110px" }
+  ];
+
+  function normalizeUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    return /^https?:\/\//i.test(u) ? u : "https://" + u;
+  }
+
+  function getAllContacts() {
+    var out = [];
+    state.jobs.forEach(function (job) {
+      (job.contacts || []).forEach(function (c) { out.push({ contact: c, job: job }); });
+    });
+    return out;
+  }
+
+  function compareContacts(a, b, key, dir) {
+    var av = key === "company" ? (a.job.company || "") : (a.contact[key] || "");
+    var bv = key === "company" ? (b.job.company || "") : (b.contact[key] || "");
+    var as = av.toString().toLowerCase(), bs = bv.toString().toLowerCase();
+    var cmp;
+    if (as === "" && bs === "") cmp = 0;
+    else if (as === "") cmp = 1;
+    else if (bs === "") cmp = -1;
+    else cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    return dir === "desc" ? -cmp : cmp;
+  }
+
+  function renderContactsTab() {
+    var entries = getAllContacts();
+
+    var searching = !!state.search.trim();
+    if (searching) {
+      var q = state.search.trim().toLowerCase();
+      entries = entries.filter(function (e) {
+        return (e.contact.name || "").toLowerCase().indexOf(q) !== -1 ||
+          (e.job.company || "").toLowerCase().indexOf(q) !== -1;
+      });
+    }
+
+    var sortCol = state.sortKey ? CONTACT_COLS.filter(function (c) { return c.key === state.sortKey; })[0] : null;
+    if (sortCol) {
+      entries = entries.slice().sort(function (a, b) { return compareContacts(a, b, sortCol.key, state.sortDir); });
+    }
+
+    var colgroup = document.getElementById("colgroup");
+    var totalW = ACTIONS_COL_WIDTH;
+    colgroup.innerHTML = '<col style="width:' + ACTIONS_COL_WIDTH + 'px">' + CONTACT_COLS.map(function (c) {
+      totalW += parseInt(c.w, 10);
+      return '<col style="width:' + c.w + '">';
+    }).join("");
+    document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
+
+    var thead = document.getElementById("thead-row");
+    thead.innerHTML = '<th class="actions-col">Actions</th>' + CONTACT_COLS.map(function (c) {
+      var active = sortCol && sortCol.key === c.key;
+      var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key + '" tabindex="0">' +
+        c.label + '<span class="arrow">' + arrow + "</span></th>";
+    }).join("");
+
+    var hintEl = document.getElementById("sort-hint");
+    hintEl.textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
+
+    var tbody = document.getElementById("tbody");
+    if (entries.length === 0) {
+      var heading = searching ? "No contacts match “" + escapeHtml(state.search.trim()) + "”" : "No contacts yet";
+      var body = searching ? "Try a different spelling, or clear the search." :
+        "Add a contact from any job's detail view, and it'll show up here.";
+      tbody.innerHTML = '<tr><td colspan="' + (CONTACT_COLS.length + 1) + '"><div class="empty"><h2>' + heading + "</h2><p>" + body + "</p></div></td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = entries.map(function (entry) {
+      var c = entry.contact, job = entry.job;
+      var companyName = job.company || "(no company)";
+      var linkedinCell = c.linkedin
+        ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener">LinkedIn ↗</a>'
+        : '<span style="color:var(--ink-faint);">—</span>';
+      var phoneDigits = (c.phone || "").replace(/[^\d+]/g, "");
+      var phoneCell = c.phone ? '<a href="tel:' + escapeHtml(phoneDigits) + '">' + escapeHtml(c.phone) + "</a>" : "";
+      var emailCell = c.email ? '<a href="mailto:' + escapeHtml(c.email) + '">' + escapeHtml(c.email) + "</a>" : "";
+      return '<tr data-cid="' + c.id + '" data-job-id="' + job.id + '">' +
+        '<td class="actions-col"><div class="row-actions">' +
+        '<button class="icon-btn" data-action="view-contact" data-cid="' + c.id + '" data-job-id="' + job.id + '" title="Open contact" aria-label="Open contact">⤢</button>' +
+        '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + c.id + '" data-job-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
+        "</div></td>" +
+        '<td class="cell-text">' + escapeHtml(c.name || "") + "</td>" +
+        '<td class="cell-text">' + escapeHtml(c.connection || "") + "</td>" +
+        '<td class="cell-text">' + phoneCell + "</td>" +
+        '<td class="cell-text">' + emailCell + "</td>" +
+        '<td class="cell-text"><button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(companyName) + "</button></td>" +
+        '<td class="cell-text">' + escapeHtml(c.dateOfContact || "") + "</td>" +
+        '<td class="cell-text">' + linkedinCell + "</td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var openJobBtn = e.target.closest('button[data-action="open-job"]');
+    if (openJobBtn) { openDrawer(openJobBtn.getAttribute("data-job-id")); return; }
+    var viewContactBtn = e.target.closest('button[data-action="view-contact"]');
+    if (viewContactBtn) { openContactDrawer(viewContactBtn.getAttribute("data-job-id"), viewContactBtn.getAttribute("data-cid")); return; }
+    var delContactBtn = e.target.closest('button[data-action="delete-contact"]');
+    if (delContactBtn) { deleteContactFromTable(delContactBtn.getAttribute("data-job-id"), delContactBtn.getAttribute("data-cid")); return; }
+  });
+
+  async function deleteContactFromTable(jobId, cid) {
+    if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
+    var job = findJob(jobId);
+    if (!job) return;
+    job.contacts = (job.contacts || []).filter(function (c) { return c.id !== cid; });
+    save(job, true);
+    renderTable();
   }
 
   function findJob(id) {
@@ -1729,6 +1933,84 @@
   scrim.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+  });
+
+  // ---------- Contact detail drawer (Contacts tab) ----------
+  var cdScrim = document.getElementById("cd-scrim");
+  var cdDrawer = document.getElementById("cd-drawer");
+  var cdCompanyLink = document.getElementById("cd-company-link");
+  var CD_FIELDS = ["phone", "email", "linkedin", "dateOfContact"];
+  var cdActive = { jobId: null, cid: null };
+
+  function findContact(jobId, cid) {
+    var job = findJob(jobId);
+    if (!job) return null;
+    var c = (job.contacts || []).find(function (x) { return x.id === cid; });
+    return c ? { job: job, contact: c } : null;
+  }
+
+  function openContactDrawer(jobId, cid) {
+    var found = findContact(jobId, cid);
+    if (!found) return;
+    cdActive = { jobId: jobId, cid: cid };
+    document.getElementById("cd-name").value = found.contact.name || "";
+    document.getElementById("cd-connection").value = found.contact.connection || "";
+    CD_FIELDS.forEach(function (f) {
+      document.getElementById("cd-" + f).value = found.contact[f] || "";
+    });
+    document.getElementById("cd-notes").value = found.contact.notes || "";
+    cdCompanyLink.textContent = (found.job.company || found.job.position || "Untitled job") + " — open job record ↗";
+    cdDrawer.classList.add("open");
+    cdDrawer.setAttribute("aria-hidden", "false");
+    cdScrim.classList.add("open");
+    document.getElementById("cd-name").focus();
+  }
+
+  function closeContactDrawer() {
+    cdDrawer.classList.remove("open");
+    cdDrawer.setAttribute("aria-hidden", "true");
+    cdScrim.classList.remove("open");
+    cdActive = { jobId: null, cid: null };
+    renderTable();
+  }
+
+  document.getElementById("cd-close").addEventListener("click", closeContactDrawer);
+  cdScrim.addEventListener("click", closeContactDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && cdDrawer.classList.contains("open")) closeContactDrawer();
+  });
+
+  cdCompanyLink.addEventListener("click", function () {
+    if (!cdActive.jobId) return;
+    var jobId = cdActive.jobId;
+    closeContactDrawer();
+    openDrawer(jobId);
+  });
+
+  function saveActiveContactField(field, value) {
+    if (!cdActive.cid) return;
+    var found = findContact(cdActive.jobId, cdActive.cid);
+    if (!found) return;
+    found.contact[field] = value;
+    save(found.job, true);
+  }
+
+  document.getElementById("cd-name").addEventListener("input", function (e) { saveActiveContactField("name", e.target.value); });
+  document.getElementById("cd-connection").addEventListener("input", function (e) { saveActiveContactField("connection", e.target.value); });
+  document.getElementById("cd-notes").addEventListener("input", function (e) { saveActiveContactField("notes", e.target.value); });
+  CD_FIELDS.forEach(function (f) {
+    document.getElementById("cd-" + f).addEventListener("input", function (e) { saveActiveContactField(f, e.target.value); });
+  });
+
+  document.getElementById("cd-delete").addEventListener("click", async function () {
+    if (!cdActive.cid) return;
+    if (!(await askConfirm("Delete this contact? This can't be undone.", "Delete"))) return;
+    var job = findJob(cdActive.jobId);
+    if (job) {
+      job.contacts = (job.contacts || []).filter(function (c) { return c.id !== cdActive.cid; });
+      save(job, true);
+    }
+    closeContactDrawer();
   });
 
   // ---------- Vet this job with Claude ----------
@@ -1899,9 +2181,13 @@
           '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
           '<div class="card-grid">' +
           field2("Name", "text", c.name, c.id, "name") +
+          field2("Connection", "text", c.connection, c.id, "connection") +
           field2("Phone", "tel", c.phone, c.id, "phone") +
           field2("Email", "email", c.email, c.id, "email") +
           field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
+          field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
+          '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
+          String(c.notes || "").replace(/</g, "&lt;") + '</textarea></div>' +
           "</div></div>";
       }).join("");
     }
@@ -1917,7 +2203,7 @@
     var job = findJob(state.activeId);
     if (!job) return;
     if (!Array.isArray(job.contacts)) job.contacts = [];
-    job.contacts.push({ id: uid(), name: "", phone: "", email: "", linkedin: "" });
+    job.contacts.push({ id: uid(), name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "" });
     save(job, true);
     renderContacts(job);
     // The new card can land below the fold in a long drawer — bring it into view so
@@ -2007,7 +2293,7 @@
 
   // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
   window.addEventListener("storage", function (e) {
-    if (e.key !== STORAGE_KEY || state.activeId) return;
+    if (e.key !== STORAGE_KEY || state.activeId || cdActive.cid) return;
     state.jobs = load();
     renderTable();
   });
