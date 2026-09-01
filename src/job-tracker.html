@@ -207,6 +207,70 @@
     overflow: hidden;
   }
 
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+
+  .search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: min(280px, 100%);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    width: 15px; height: 15px;
+    color: var(--ink-faint);
+    pointer-events: none;
+  }
+
+  .search-field input {
+    width: 100%;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 7px 28px 7px 30px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .search-field input:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .search-field input::placeholder { color: var(--ink-faint); }
+
+  .search-field #search-clear {
+    position: absolute;
+    right: 6px;
+    border: none;
+    background: transparent;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 0.72rem;
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .search-field #search-clear:hover { background: var(--surface-sunken); color: var(--ink); }
+  .search-field.has-value #search-clear { display: flex; }
+
+  .sort-hint {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
   .sheet-scroll {
     overflow-x: auto;
   }
@@ -235,6 +299,21 @@
   }
 
   thead th:last-child { border-right: none; }
+
+  thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th.sortable:hover { color: var(--ink); background: var(--surface-sunken); }
+  thead th.sortable .arrow {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0;
+    color: var(--accent);
+  }
+  thead th.sortable.active .arrow { opacity: 1; }
+  thead th.sortable.active { color: var(--ink); }
+  thead th:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 
   tbody td {
     padding: 0;
@@ -274,6 +353,11 @@
 
   .cell-num { text-align: right; }
   .cell-num input { text-align: right; }
+
+  input.low-rating, .field input.low-rating {
+    color: var(--danger);
+    font-weight: 600;
+  }
 
   .chk-cell { text-align: center; }
   .chk-cell input[type="checkbox"] {
@@ -561,7 +645,23 @@
   }
   .stage-jobs { background: var(--surface-sunken); color: var(--ink-muted); }
   .stage-applied { background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .stage-interviewing { background: var(--warn-soft); color: var(--warn); }
   .stage-rejected { background: var(--danger-soft); color: var(--danger); }
+
+  .sync-status {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sync-status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ink-faint);
+    flex: none;
+  }
+  .sync-status.on .dot { background: var(--success); }
+  .sync-status.off .dot { background: var(--warn); }
 
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -575,7 +675,7 @@
   <header class="topbar">
     <div>
       <h1>Job Tracker</h1>
-      <div class="sub">Your search, one sheet at a time. Everything saves automatically on this device.</div>
+      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span></div>
     </div>
     <div class="stats" id="stats"></div>
   </header>
@@ -583,10 +683,19 @@
   <nav class="tabs" role="tablist" aria-label="Job tracker stages">
     <button class="tab" role="tab" data-stage="jobs" aria-selected="true">Jobs <span class="count" id="count-jobs">0</span></button>
     <button class="tab" role="tab" data-stage="applied" aria-selected="false">Applied <span class="count" id="count-applied">0</span></button>
+    <button class="tab" role="tab" data-stage="interviewing" aria-selected="false">Interviewing <span class="count" id="count-interviewing">0</span></button>
     <button class="tab" role="tab" data-stage="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
   </nav>
 
   <div class="sheet">
+    <div class="toolbar">
+      <div class="search-field">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input type="text" id="search-input" placeholder="Search by company name">
+        <button type="button" id="search-clear" aria-label="Clear search">✕</button>
+      </div>
+      <span class="sort-hint" id="sort-hint"></span>
+    </div>
     <div class="sheet-scroll">
       <table id="table">
         <thead><tr id="thead-row"></tr></thead>
@@ -617,7 +726,7 @@
         <div class="field"><label for="d-location">Location</label>
           <select id="d-location"><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option><option value="On-site">On-site</option></select>
         </div>
-        <div class="field"><label for="d-reviewPercent">Glassdoor overall rating (%)</label><input type="number" id="d-reviewPercent" min="0" max="100" step="1"></div>
+        <div class="field"><label for="d-reviewPercent">Glassdoor rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
         <div class="field"><label for="d-reviewCount">Glassdoor # of reviews</label><input type="number" id="d-reviewCount" min="0" step="1"></div>
         <div class="field"><label for="d-postedSalary">Posted salary</label><input type="text" id="d-postedSalary" placeholder="e.g. $110k – $130k"></div>
         <div class="field"><label for="d-salaryAsk">Salary ask</label><input type="text" id="d-salaryAsk" placeholder="e.g. $125k"></div>
@@ -672,7 +781,7 @@
   "use strict";
 
   var STORAGE_KEY = "jobTrackerData.v1";
-  var state = { activeStage: "jobs", activeId: null, jobs: [] };
+  var state = { activeStage: "jobs", activeId: null, jobs: [], search: "", sortKey: null, sortDir: "asc" };
 
   function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -687,15 +796,108 @@
     return [];
   }
 
-  function save() {
+  function localSave() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobs: state.jobs }));
     } catch (e) { /* storage unavailable; edits stay in-memory for this session */ }
   }
 
+  // ---------- Cloud sync (db capability) ----------
+  // localStorage is per-browser only, so a record made here is invisible from a
+  // different browser or device. When the "db" capability is granted, every write
+  // also goes to the artifact's shared document store, keyed by job id, so the
+  // same tracker is reachable from anywhere the viewer is signed in.
+  var dbApi = null;
+  var jobsCol = null;
+  var writeTimers = {};
+  var syncStatusEl = document.getElementById("sync-status");
+  var syncStatusText = document.getElementById("sync-status-text");
+
+  function setSyncStatus(mode, text) {
+    if (!syncStatusEl) return;
+    syncStatusEl.className = "sync-status" + (mode ? " " + mode : "");
+    syncStatusText.textContent = text;
+  }
+
+  function cloneJob(job) {
+    return JSON.parse(JSON.stringify(job));
+  }
+
+  function normalizeJob(data) {
+    var j = blankJob();
+    Object.keys(j).forEach(function (k) {
+      if (data && data[k] !== undefined) j[k] = data[k];
+    });
+    if (data && data.id) j.id = data.id;
+    return j;
+  }
+
+  function save(job, immediate) {
+    localSave();
+    if (!jobsCol || !job) return;
+    var id = job.id;
+    if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
+    var body = cloneJob(job);
+    var doWrite = function () {
+      delete writeTimers[id];
+      jobsCol.doc(id).set(body).catch(function () {
+        setSyncStatus("off", "Sync paused — changes are saved on this device");
+      });
+    };
+    if (immediate) doWrite();
+    else writeTimers[id] = setTimeout(doWrite, 500);
+  }
+
+  function deleteFromDb(id) {
+    if (!jobsCol) return;
+    if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
+    jobsCol.doc(id).delete().catch(function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+  }
+
+  async function initCloudSync() {
+    if (!window.claude || typeof window.claude.use !== "function") {
+      setSyncStatus("off", "Saved on this device only");
+      return;
+    }
+    try {
+      dbApi = await window.claude.use("db");
+    } catch (e) {
+      dbApi = null;
+    }
+    if (!dbApi) {
+      setSyncStatus("off", "Saved on this device only");
+      return;
+    }
+    jobsCol = dbApi.collection("jobs");
+    try {
+      var snap = await jobsCol.orderBy("createdAt").get();
+      if (!snap.empty) {
+        state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
+        localSave();
+        renderTable();
+      } else if (state.jobs.length) {
+        state.jobs.forEach(function (j) { save(j, true); });
+      }
+    } catch (e) { /* keep whatever loaded from localStorage */ }
+
+    jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
+      if (state.activeId) return; // don't clobber an in-progress edit in the drawer
+      var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
+      state.jobs = jobs;
+      localSave();
+      renderTable();
+    }, function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+
+    setSyncStatus("on", "Synced to your account");
+  }
+
   function blankJob() {
     return {
-      id: uid(), stage: "jobs",
+      id: uid(), stage: "jobs", createdAt: Date.now(),
       date: "", position: "", company: "",
       reviewPercent: "", reviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
@@ -713,7 +915,7 @@
     { key: "date", label: "Date", type: "date", w: "112px" },
     { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
     { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" },
-    { key: "reviewPercent", label: "Glassdoor %", type: "number", num: true, w: "104px" },
+    { key: "reviewPercent", label: "Glassdoor rating", type: "number", num: true, min: 0, max: 5, step: 0.1, w: "116px" },
     { key: "reviewCount", label: "Glassdoor #", type: "number", num: true, w: "100px" },
     { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" },
     { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" },
@@ -729,8 +931,8 @@
   var COLS_REJECTED = COLS_APPLIED.concat([
     { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" }
   ]);
-  var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, rejected: COLS_REJECTED };
-  var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", rejected: "Rejected" };
+  var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, interviewing: COLS_APPLIED, rejected: COLS_REJECTED };
+  var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
 
   // ---------- Tabs ----------
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
@@ -738,17 +940,55 @@
     t.addEventListener("click", function () {
       state.activeStage = t.getAttribute("data-stage");
       tabs.forEach(function (o) { o.setAttribute("aria-selected", o === t ? "true" : "false"); });
+      state.sortKey = null;
       renderTable();
     });
+  });
+
+  // ---------- Search ----------
+  var searchInput = document.getElementById("search-input");
+  var searchField = document.querySelector(".search-field");
+  document.getElementById("search-clear").addEventListener("click", function () {
+    state.search = "";
+    searchInput.value = "";
+    searchField.classList.remove("has-value");
+    searchInput.focus();
+    renderTable();
+  });
+  searchInput.addEventListener("input", function () {
+    state.search = searchInput.value;
+    searchField.classList.toggle("has-value", !!state.search);
+    renderTable();
+  });
+
+  // ---------- Sortable headers ----------
+  document.getElementById("thead-row").addEventListener("click", function (e) {
+    var th = e.target.closest("th.sortable");
+    if (!th) return;
+    var key = th.getAttribute("data-key");
+    if (state.sortKey === key) state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+    else { state.sortKey = key; state.sortDir = "asc"; }
+    renderTable();
+  });
+  document.getElementById("thead-row").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var th = e.target.closest("th.sortable");
+    if (!th) return;
+    e.preventDefault();
+    th.click();
   });
 
   document.getElementById("add-btn").addEventListener("click", function () {
     var job = blankJob();
     job.stage = state.activeStage;
     if (state.activeStage === "applied" && !job.dateApplied) job.dateApplied = todayStr();
+    if (state.activeStage === "interviewing") {
+      job.dateApplied = job.dateApplied || todayStr();
+      job.interviewing = true;
+    }
     if (state.activeStage === "rejected" && !job.dateRejected) job.dateRejected = todayStr();
     state.jobs.push(job);
-    save();
+    save(job, true);
     renderTable();
     openDrawer(job.id);
   });
@@ -762,14 +1002,18 @@
 
   function fmt(v) { return v === undefined || v === null ? "" : v; }
 
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
   // ---------- Table rendering ----------
   function renderStats() {
     var jobs = state.jobs.filter(function (j) { return j.stage === "jobs"; }).length;
     var applied = state.jobs.filter(function (j) { return j.stage === "applied"; }).length;
-    var interviewing = state.jobs.filter(function (j) { return j.interviewing; }).length;
+    var interviewing = state.jobs.filter(function (j) { return j.stage === "interviewing"; }).length;
     var rejected = state.jobs.filter(function (j) { return j.stage === "rejected"; }).length;
     document.getElementById("stats").innerHTML = [
-      ["Tracking", jobs + applied + rejected],
+      ["Tracking", jobs + applied + interviewing + rejected],
       ["Applied", applied],
       ["Interviewing", interviewing],
       ["Rejected", rejected]
@@ -778,6 +1022,7 @@
     }).join("");
     document.getElementById("count-jobs").textContent = jobs;
     document.getElementById("count-applied").textContent = applied;
+    document.getElementById("count-interviewing").textContent = interviewing;
     document.getElementById("count-rejected").textContent = rejected;
   }
 
@@ -794,8 +1039,40 @@
     }
     var type = col.type === "number" ? "number" : (col.type === "date" ? "date" : "text");
     var esc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key + '"' +
-      (col.num ? ' inputmode="decimal"' : "") + '>';
+    var extra = col.num ? ' inputmode="decimal"' : "";
+    if (col.min !== undefined) extra += ' min="' + col.min + '"';
+    if (col.max !== undefined) extra += ' max="' + col.max + '"';
+    if (col.step !== undefined) extra += ' step="' + col.step + '"';
+    var cls = col.key === "reviewPercent" && isLowRating(v) ? ' class="low-rating"' : "";
+    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key + '"' + cls + extra + '>';
+  }
+
+  function isLowRating(v) {
+    var n = parseFloat(v);
+    return v !== "" && !isNaN(n) && n < 3;
+  }
+
+  function compareJobs(a, b, col, dir) {
+    var av = a[col.key], bv = b[col.key];
+    var cmp;
+    if (col.type === "number") {
+      var an = av === "" || av === null || av === undefined || isNaN(av) ? null : parseFloat(av);
+      var bn = bv === "" || bv === null || bv === undefined || isNaN(bv) ? null : parseFloat(bv);
+      if (an === null && bn === null) cmp = 0;
+      else if (an === null) cmp = 1;
+      else if (bn === null) cmp = -1;
+      else cmp = an - bn;
+    } else if (col.type === "checkbox") {
+      cmp = (bv ? 1 : 0) - (av ? 1 : 0);
+    } else {
+      var as = (av || "").toString().toLowerCase();
+      var bs = (bv || "").toString().toLowerCase();
+      if (as === "" && bs === "") cmp = 0;
+      else if (as === "") cmp = 1;
+      else if (bs === "") cmp = -1;
+      else cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    }
+    return dir === "desc" ? -cmp : cmp;
   }
 
   function renderTable() {
@@ -804,17 +1081,37 @@
     var cols = STAGE_COLS[stage];
     var rows = state.jobs.filter(function (j) { return j.stage === stage; });
 
+    var searching = !!state.search.trim();
+    if (searching) {
+      var q = state.search.trim().toLowerCase();
+      rows = rows.filter(function (j) { return (j.company || "").toLowerCase().indexOf(q) !== -1; });
+    }
+
+    var sortCol = state.sortKey ? cols.filter(function (c) { return c.key === state.sortKey; })[0] : null;
+    if (sortCol) {
+      rows = rows.slice().sort(function (a, b) { return compareJobs(a, b, sortCol, state.sortDir); });
+    }
+
     var thead = document.getElementById("thead-row");
     thead.innerHTML = cols.map(function (c) {
-      return '<th style="width:' + c.w + '">' + c.label + "</th>";
-    }).join("") + '<th style="width:150px">Actions</th>';
+      var active = sortCol && sortCol.key === c.key;
+      var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key +
+        '" tabindex="0" style="width:' + c.w + '">' + c.label + '<span class="arrow">' + arrow + "</span></th>";
+    }).join("") + '<th style="width:180px">Actions</th>';
+
+    var hintEl = document.getElementById("sort-hint");
+    hintEl.textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
 
     var tbody = document.getElementById("tbody");
     if (rows.length === 0) {
+      var heading = searching ? "No companies match “" + escapeHtml(state.search.trim()) + "”" : "No records in " + STAGE_LABEL[stage] + " yet";
+      var body = searching ? "Try a different spelling, or clear the search to see everything in " + STAGE_LABEL[stage] + "." :
+        (stage === "jobs" ? "Add a role you're considering to start tracking it." : "Move a record here from another tab, or add one directly.");
       tbody.innerHTML = '<tr><td colspan="' + (cols.length + 1) + '"><div class="empty">' +
-        "<h2>No records in " + STAGE_LABEL[stage] + " yet</h2>" +
-        "<p>" + (stage === "jobs" ? "Add a role you're considering to start tracking it." : "Move a record here from another tab, or add one directly.") + "</p>" +
-        '<button class="btn btn-primary" type="button" onclick="document.getElementById(\'add-btn\').click()">+ Add job</button>' +
+        "<h2>" + heading + "</h2>" +
+        "<p>" + body + "</p>" +
+        (searching ? "" : '<button class="btn btn-primary" type="button" onclick="document.getElementById(\'add-btn\').click()">+ Add job</button>') +
         "</div></td></tr>";
       return;
     }
@@ -830,6 +1127,9 @@
         moveBtns = '<button class="move-btn" data-action="to-applied" data-id="' + job.id + '">Applied →</button>';
       } else if (stage === "applied") {
         moveBtns = '<button class="move-btn back" data-action="to-jobs" data-id="' + job.id + '">← Jobs</button>' +
+          '<button class="move-btn" data-action="to-rejected" data-id="' + job.id + '">Rejected →</button>';
+      } else if (stage === "interviewing") {
+        moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>' +
           '<button class="move-btn" data-action="to-rejected" data-id="' + job.id + '">Rejected →</button>';
       } else if (stage === "rejected") {
         moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>';
@@ -849,6 +1149,17 @@
     return null;
   }
 
+  // Checking "Interviewing" while a row is in Applied moves it to the Interviewing tab;
+  // unchecking it while in Interviewing moves it back to Applied. Shared by the main
+  // sheet and the drawer.
+  function applyInterviewingToggle(job, checked) {
+    job.interviewing = checked;
+    var moved = false;
+    if (checked && job.stage === "applied") { job.stage = "interviewing"; moved = true; }
+    else if (!checked && job.stage === "interviewing") { job.stage = "applied"; moved = true; }
+    return moved;
+  }
+
   // Delegated input/change handling for inline editing (avoids full re-render per keystroke)
   document.getElementById("tbody").addEventListener("input", function (e) {
     var el = e.target;
@@ -858,15 +1169,21 @@
     if (!job) return;
     if (el.type === "checkbox") job[field] = el.checked;
     else job[field] = el.value;
-    save();
+    if (field === "reviewPercent") el.classList.toggle("low-rating", isLowRating(el.value));
+    save(job);
   });
 
   document.getElementById("tbody").addEventListener("change", function (e) {
     var el = e.target;
-    if (el.tagName === "SELECT") {
-      var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
-      var job = findJob(id);
-      if (job) { job[field] = el.value; save(); }
+    var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
+    var job = id ? findJob(id) : null;
+    if (job && el.tagName === "SELECT") {
+      job[field] = el.value;
+      save(job);
+    } else if (job && el.type === "checkbox" && field === "interviewing") {
+      var moved = applyInterviewingToggle(job, el.checked);
+      save(job, true);
+      if (moved) { renderTable(); return; }
     }
     renderStats();
   });
@@ -882,20 +1199,24 @@
     if (action === "delete") {
       if (confirm("Delete this record? This can't be undone.")) {
         state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
-        save(); renderTable();
+        localSave();
+        deleteFromDb(id);
+        renderTable();
       }
       return;
     }
     if (action === "to-applied") {
       job.stage = "applied";
+      job.interviewing = false;
       if (!job.dateApplied) job.dateApplied = todayStr();
     } else if (action === "to-rejected") {
       job.stage = "rejected";
       if (!job.dateRejected) job.dateRejected = todayStr();
     } else if (action === "to-jobs") {
       job.stage = "jobs";
+      job.interviewing = false;
     }
-    save();
+    save(job, true);
     renderTable();
   });
 
@@ -905,6 +1226,12 @@
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
+
+  function updateStageBadge(job) {
+    var badge = document.getElementById("d-stage-badge");
+    badge.textContent = STAGE_LABEL[job.stage];
+    badge.className = "stage-badge stage-" + job.stage;
+  }
 
   function openDrawer(id) {
     var job = findJob(id);
@@ -918,10 +1245,9 @@
       if (el) el.value = job[f] || "";
     });
     document.getElementById("d-interviewing").checked = !!job.interviewing;
+    document.getElementById("d-reviewPercent").classList.toggle("low-rating", isLowRating(job.reviewPercent));
 
-    var badge = document.getElementById("d-stage-badge");
-    badge.textContent = STAGE_LABEL[job.stage];
-    badge.className = "stage-badge stage-" + job.stage;
+    updateStageBadge(job);
 
     renderContacts(job);
     renderEntries(job, "interviews", "interviews-list");
@@ -952,7 +1278,8 @@
     if (confirm("Delete this record? This can't be undone.")) {
       var id = state.activeId;
       state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
-      save();
+      localSave();
+      deleteFromDb(id);
       closeDrawer();
     }
   });
@@ -962,20 +1289,31 @@
     if (!state.activeId) return;
     var job = findJob(state.activeId);
     if (!job) return;
-    if (el.id === "d-position") { job.position = el.value; return; }
-    if (el.id === "d-company") { job.company = el.value; return; }
-    if (el.id === "d-interviewing") { job.interviewing = el.checked; save(); return; }
+    if (el.id === "d-position") { job.position = el.value; save(job); return; }
+    if (el.id === "d-company") { job.company = el.value; save(job); return; }
+    if (el.id === "d-interviewing") {
+      var moved = applyInterviewingToggle(job, el.checked);
+      updateStageBadge(job);
+      save(job, true);
+      if (moved) renderTable();
+      return;
+    }
     var m = el.id.match(/^d-(.+)$/);
     if (m && SIMPLE_FIELDS.indexOf(m[1]) !== -1) {
       job[m[1]] = el.value;
-      save();
+      if (m[1] === "reviewPercent") el.classList.toggle("low-rating", isLowRating(el.value));
+      save(job);
     }
   });
   document.getElementById("drawer").addEventListener("blur", function (e) {
-    if (e.target.id === "d-position" || e.target.id === "d-company") save();
+    var job = state.activeId && findJob(state.activeId);
+    if (job && (e.target.id === "d-position" || e.target.id === "d-company")) save(job, true);
   }, true);
   document.getElementById("drawer").addEventListener("change", function (e) {
-    if (e.target.id === "d-location" || e.target.id === "d-interviewing" || e.target.tagName === "INPUT") save();
+    var job = state.activeId && findJob(state.activeId);
+    if (job && (e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
+      save(job, true);
+    }
   });
 
   // ---------- Contacts ----------
@@ -1007,7 +1345,7 @@
     var job = findJob(state.activeId);
     if (!job) return;
     job.contacts.push({ id: uid(), name: "", phone: "", email: "", linkedin: "" });
-    save();
+    save(job, true);
     renderContacts(job);
   });
 
@@ -1018,16 +1356,17 @@
     var job = findJob(state.activeId);
     if (!job) return;
     var c = job.contacts.find(function (x) { return x.id === cid; });
-    if (c) { c[field] = el.value; save(); }
+    if (c) { c[field] = el.value; save(job); }
   });
 
   document.getElementById("contacts-list").addEventListener("click", function (e) {
     var btn = e.target.closest('button[data-action="rm-contact"]');
     if (!btn) return;
+    if (!confirm("Remove this contact? This can't be undone.")) return;
     var job = findJob(state.activeId);
     if (!job) return;
     job.contacts = job.contacts.filter(function (c) { return c.id !== btn.getAttribute("data-cid"); });
-    save();
+    save(job, true);
     renderContacts(job);
   });
 
@@ -1056,7 +1395,7 @@
       var job = findJob(state.activeId);
       if (!job) return;
       job[key].push({ id: uid(), date: "", notes: "" });
-      save();
+      save(job, true);
       renderEntries(job, key, listId);
     });
     var list = document.getElementById(listId);
@@ -1067,15 +1406,17 @@
       var job = findJob(state.activeId);
       if (!job) return;
       var entry = job[key].find(function (x) { return x.id === eid; });
-      if (entry) { entry[field] = el.value; save(); }
+      if (entry) { entry[field] = el.value; save(job); }
     });
     list.addEventListener("click", function (e) {
       var btn = e.target.closest('button[data-action="rm-entry"]');
       if (!btn) return;
+      var noun = key === "interviews" ? "interview" : "follow-up";
+      if (!confirm("Remove this " + noun + "? This can't be undone.")) return;
       var job = findJob(state.activeId);
       if (!job) return;
       job[key] = job[key].filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
-      save();
+      save(job, true);
       renderEntries(job, key, listId);
     });
   }
@@ -1083,7 +1424,15 @@
   bindEntrySection("interviews", "interviews-list", "add-interview");
   bindEntrySection("followups", "followups-list", "add-followup");
 
+  // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
+  window.addEventListener("storage", function (e) {
+    if (e.key !== STORAGE_KEY || state.activeId) return;
+    state.jobs = load();
+    renderTable();
+  });
+
   renderTable();
+  initCloudSync();
 })();
 </script>
 
