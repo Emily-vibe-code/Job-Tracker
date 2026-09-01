@@ -488,6 +488,14 @@
   .linkedin-inner input { flex: 1 1 auto; min-width: 0; }
   .linkedin-inner a.icon-btn { flex: none; text-decoration: none; }
 
+  /* Drawer version of the same input + "open" affordance (Company URL, Job posting
+     link, LinkedIn) — plain flex is fine here since these live in a CSS grid, not a
+     fixed-layout table. */
+  .url-input-row { display: flex; align-items: center; gap: 6px; }
+  .url-input-row input { flex: 1 1 auto; min-width: 0; }
+  .url-input-row a.icon-btn { flex: none; text-decoration: none; }
+  .url-input-row a.icon-btn.disabled { opacity: 0.35; pointer-events: none; }
+
   .icon-btn {
     border: 1px solid var(--border);
     background: var(--surface);
@@ -887,8 +895,12 @@
         <div class="field"><label for="d-salaryAsk">Salary ask</label><input type="text" id="d-salaryAsk" placeholder="e.g. $125k"></div>
         <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
         <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
-        <div class="field span-2"><label for="d-companyUrl">Company URL</label><input type="text" id="d-companyUrl" placeholder="https://"></div>
-        <div class="field span-2"><label for="d-postingUrl">Job posting link</label><input type="text" id="d-postingUrl" placeholder="https://"></div>
+        <div class="field span-2"><label for="d-companyUrl">Company URL</label>
+          <div class="url-input-row"><input type="text" id="d-companyUrl" placeholder="https://"><a class="icon-btn" id="d-companyUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
+        </div>
+        <div class="field span-2"><label for="d-postingUrl">Job posting link</label>
+          <div class="url-input-row"><input type="text" id="d-postingUrl" placeholder="https://"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
+        </div>
         <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
         <div class="field span-2">
           <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
@@ -951,7 +963,9 @@
       <div class="field-grid">
         <div class="field"><label for="cd-phone">Phone number</label><input type="tel" id="cd-phone" placeholder="e.g. (555) 123-4567"></div>
         <div class="field"><label for="cd-email">Email address</label><input type="email" id="cd-email" placeholder="name@company.com"></div>
-        <div class="field"><label for="cd-linkedin">LinkedIn</label><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."></div>
+        <div class="field"><label for="cd-linkedin">LinkedIn</label>
+          <div class="url-input-row"><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."><a class="icon-btn" id="cd-linkedin-open" href="#" target="_blank" rel="noopener" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a></div>
+        </div>
         <div class="field"><label for="cd-dateOfContact">Date of contact</label><input type="date" id="cd-dateOfContact"></div>
         <div class="field span-2">
           <label>Company</label>
@@ -1819,6 +1833,24 @@
     return /^https?:\/\//i.test(u) ? u : "https://" + u;
   }
 
+  // Wires an <input> up to a companion <a class="icon-btn"> "open" link, keeping the
+  // link's href (and enabled/disabled look) in sync as the field is typed into.
+  // Returns a sync() you can call after setting el.value programmatically (e.g. when a
+  // drawer opens), since that doesn't fire its own "input" event.
+  var urlFieldSyncs = {};
+  function wireUrlField(inputId, linkId) {
+    var input = document.getElementById(inputId);
+    var link = document.getElementById(linkId);
+    function sync() {
+      var v = input.value.trim();
+      if (v) { link.href = normalizeUrl(v); link.classList.remove("disabled"); }
+      else { link.removeAttribute("href"); link.classList.add("disabled"); }
+    }
+    input.addEventListener("input", sync);
+    sync();
+    urlFieldSyncs[inputId] = sync;
+  }
+
   function getAllContacts() { return state.contacts; }
 
   function compareContacts(a, b, key, dir) {
@@ -2096,6 +2128,8 @@
     });
     document.getElementById("d-interviewing").checked = !!job.interviewing;
     document.getElementById("d-reviewPercent").classList.toggle("low-rating", isLowRating(job.reviewPercent));
+    urlFieldSyncs["d-companyUrl"]();
+    urlFieldSyncs["d-postingUrl"]();
 
     updateStageBadge(job);
 
@@ -2146,6 +2180,7 @@
       document.getElementById("cd-" + f).value = c[f] || "";
     });
     document.getElementById("cd-notes").value = c.notes || "";
+    urlFieldSyncs["cd-linkedin"]();
     var job = c.jobId ? findJob(c.jobId) : null;
     if (syncContactCompany(c)) saveContact(c, false);
     if (job) {
@@ -2503,6 +2538,10 @@
     if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
   });
+
+  wireUrlField("d-companyUrl", "d-companyUrl-open");
+  wireUrlField("d-postingUrl", "d-postingUrl-open");
+  wireUrlField("cd-linkedin", "cd-linkedin-open");
 
   renderTable();
   initExport();
