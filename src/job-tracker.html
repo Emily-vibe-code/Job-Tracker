@@ -273,7 +273,19 @@
 
   .sheet-scroll {
     overflow-x: auto;
+    /* A persistent, visible scrollbar — macOS hides overflow scrollbars by default until
+       actively scrolling, which made horizontal scroll here easy to miss entirely. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) var(--surface-alt);
   }
+  .sheet-scroll::-webkit-scrollbar { height: 11px; }
+  .sheet-scroll::-webkit-scrollbar-track { background: var(--surface-alt); }
+  .sheet-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 6px;
+    border: 2px solid var(--surface-alt);
+  }
+  .sheet-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
 
   table {
     border-collapse: separate;
@@ -299,7 +311,9 @@
     z-index: 1;
   }
 
-  thead th:last-child { border-right: none; }
+  /* The last column keeps its right border (unlike a typical last-child reset) — with
+     the table no longer stretched to fill its container, that border is what marks
+     where real columns end and blank canvas begins. */
 
   thead th.sortable {
     cursor: pointer;
@@ -342,7 +356,6 @@
     vertical-align: middle;
   }
 
-  tbody td:last-child { border-right: none; }
 
   tbody tr:hover { background: var(--surface-alt); }
   tbody tr:hover td { background: var(--surface-alt); }
