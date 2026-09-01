@@ -1579,7 +1579,12 @@
 
   var COLS_JOBS = BASE_COLS.concat([COL_DATE_APPLIED, COL_INTERVIEWING]);
   var COLS_APPLIED = BASE_COLS.concat([COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING]);
-  var COLS_REJECTED = COLS_APPLIED.concat([COL_DATE_REJECTED, COL_REJECTION_REASON]);
+  // Reason sits right after Date (3rd column overall, after the pinned Actions column) —
+  // spliced in rather than appended, so it's not just tacked on the end.
+  var COLS_REJECTED = [BASE_COLS[0], COL_REJECTION_REASON].concat(
+    BASE_COLS.slice(1),
+    [COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING, COL_DATE_REJECTED]
+  );
   var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, interviewing: COLS_APPLIED, rejected: COLS_REJECTED };
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
 
