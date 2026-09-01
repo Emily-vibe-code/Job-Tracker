@@ -90,7 +90,7 @@
   }
 
   .app {
-    max-width: 1440px;
+    max-width: min(2200px, 96vw);
     margin: 0 auto;
     padding: 28px 28px 80px;
   }
@@ -279,6 +279,7 @@
     border-collapse: collapse;
     width: 100%;
     min-width: 980px;
+    table-layout: fixed;
   }
 
   thead th {
@@ -305,6 +306,25 @@
     user-select: none;
   }
   thead th.sortable:hover { color: var(--ink); background: var(--surface-sunken); }
+
+  .col-resizer {
+    position: absolute;
+    top: 0; right: -3px; bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 4;
+    touch-action: none;
+  }
+  .col-resizer::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 3px;
+    width: 2px;
+    background: transparent;
+  }
+  .col-resizer:hover::after, .col-resizer.dragging::after { background: var(--accent); }
+  body.col-resizing { cursor: col-resize !important; user-select: none; }
+  body.col-resizing * { cursor: col-resize !important; }
   thead th.sortable .arrow {
     display: inline-block;
     margin-left: 4px;
@@ -461,6 +481,7 @@
   .btn:hover { background: var(--surface-alt); border-color: var(--border-strong); }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary.danger-btn { background: var(--danger); border-color: var(--danger); color: #fff; }
   .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
   .empty {
@@ -852,6 +873,7 @@
   <h2 id="paste-modal-title">Paste from bookmarklet</h2>
   <p>Click "+ Add-job bookmarklet" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).</p>
   <textarea id="paste-textarea" rows="4" placeholder="Position: ...&#10;Company: ...&#10;Posting: ..."></textarea>
+  <p id="paste-error" style="display:none; margin:8px 0 0; font-size:0.8rem; color:var(--danger);"></p>
   <div class="paste-modal-actions">
     <button type="button" id="paste-cancel" class="btn">Cancel</button>
     <button type="button" id="paste-confirm" class="btn btn-primary">Add job</button>
@@ -869,14 +891,39 @@
   </div>
 </div>
 
+<div class="scrim" id="confirm-scrim"></div>
+<div class="paste-modal" id="confirm-modal" aria-hidden="true" role="alertdialog" aria-labelledby="confirm-message">
+  <p id="confirm-message" style="margin:0 0 16px; font-size:0.92rem; color:var(--ink); line-height:1.5;">Are you sure?</p>
+  <div class="paste-modal-actions">
+    <button type="button" id="confirm-cancel" class="btn">Cancel</button>
+    <button type="button" id="confirm-ok" class="btn btn-primary danger-btn">Delete</button>
+  </div>
+</div>
+
 <script>
 (function () {
   "use strict";
 
   var STORAGE_KEY = "jobTrackerData.v1";
-  var state = { activeStage: "jobs", activeId: null, jobs: [], search: "", sortKey: null, sortDir: "asc" };
+  var COLWIDTH_KEY = "jobTrackerColWidths.v1";
+  var state = { activeStage: "jobs", activeId: null, jobs: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
 
   function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function loadColWidths() {
+    try {
+      var raw = localStorage.getItem(COLWIDTH_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") return parsed;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return {};
+  }
+
+  function saveColWidths() {
+    try { localStorage.setItem(COLWIDTH_KEY, JSON.stringify(state.colWidths)); } catch (e) { /* per-device preference only; safe to skip */ }
+  }
 
   function load() {
     try {
@@ -1010,10 +1057,10 @@
       try {
         await downloadsApi.save({ filename: filename, data: payload });
         exportBtn.textContent = "Backup saved";
-        setTimeout(function () { exportBtn.textContent = originalLabel; }, 2000);
       } catch (e) {
-        if (!e || e.code !== "declined") alert("Couldn't save the backup just now — try again in a moment.");
+        exportBtn.textContent = (!e || e.code !== "declined") ? "Couldn't save — try again" : originalLabel;
       }
+      setTimeout(function () { exportBtn.textContent = originalLabel; }, 2200);
       return;
     }
     if (hasClaudeRuntime) return; // capability unavailable; button is hidden, this is just a safeguard
@@ -1148,9 +1195,11 @@
   var pasteScrim = document.getElementById("paste-scrim");
   var pasteModal = document.getElementById("paste-modal");
   var pasteTextarea = document.getElementById("paste-textarea");
+  var pasteError = document.getElementById("paste-error");
 
   function openPasteModal() {
     pasteTextarea.value = "";
+    pasteError.style.display = "none";
     pasteScrim.classList.add("open");
     pasteModal.classList.add("open");
     pasteModal.setAttribute("aria-hidden", "false");
@@ -1170,9 +1219,11 @@
   document.getElementById("paste-confirm").addEventListener("click", function () {
     var fields = parseBookmarkletClipboard(pasteTextarea.value);
     if (!fields.position && !fields.company && !fields.postingUrl) {
-      alert("That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the job posting's page, copy again, then paste it here.");
+      pasteError.textContent = "That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the job posting's page, copy again, then paste it here.";
+      pasteError.style.display = "block";
       return;
     }
+    pasteError.style.display = "none";
     closePasteModal();
     addJobFromCapture(fields);
   });
@@ -1191,6 +1242,7 @@
   }
 
   state.jobs = load();
+  state.colWidths = loadColWidths();
 
   // ---------- Column definitions per stage ----------
   var BASE_COLS = [
@@ -1247,6 +1299,7 @@
 
   // ---------- Sortable headers ----------
   document.getElementById("thead-row").addEventListener("click", function (e) {
+    if (e.target.closest(".col-resizer")) return;
     var th = e.target.closest("th.sortable");
     if (!th) return;
     var key = th.getAttribute("data-key");
@@ -1260,6 +1313,43 @@
     if (!th) return;
     e.preventDefault();
     th.click();
+  });
+
+  // ---------- Column resizing ----------
+  // Widths persist per-device (localStorage) — a layout preference, not tracker data,
+  // so it isn't part of the synced job records.
+  var MIN_COL_WIDTH = 60;
+  var resizeDrag = null; // { key, th, startX, startWidth }
+
+  document.getElementById("thead-row").addEventListener("mousedown", function (e) {
+    var handle = e.target.closest(".col-resizer");
+    if (!handle) return;
+    e.preventDefault();
+    var th = handle.closest("th");
+    resizeDrag = {
+      key: handle.getAttribute("data-key"),
+      th: th,
+      startX: e.clientX,
+      startWidth: th.getBoundingClientRect().width
+    };
+    handle.classList.add("dragging");
+    document.body.classList.add("col-resizing");
+  });
+
+  document.addEventListener("mousemove", function (e) {
+    if (!resizeDrag) return;
+    var next = Math.max(MIN_COL_WIDTH, Math.round(resizeDrag.startWidth + (e.clientX - resizeDrag.startX)));
+    resizeDrag.th.style.width = next + "px";
+  });
+
+  document.addEventListener("mouseup", function () {
+    if (!resizeDrag) return;
+    var finalWidth = parseInt(resizeDrag.th.style.width, 10);
+    state.colWidths[resizeDrag.key] = finalWidth;
+    saveColWidths();
+    document.querySelectorAll(".col-resizer.dragging").forEach(function (el) { el.classList.remove("dragging"); });
+    document.body.classList.remove("col-resizing");
+    resizeDrag = null;
   });
 
   document.getElementById("add-btn").addEventListener("click", function () {
@@ -1377,11 +1467,15 @@
     }
 
     var thead = document.getElementById("thead-row");
-    thead.innerHTML = '<th class="actions-col" style="width:180px">Actions</th>' + cols.map(function (c) {
+    var actionsW = state.colWidths.actions || 180;
+    thead.innerHTML = '<th class="actions-col" style="width:' + actionsW + 'px">Actions' +
+      '<span class="col-resizer" data-key="actions"></span></th>' + cols.map(function (c) {
       var active = sortCol && sortCol.key === c.key;
       var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      var w = state.colWidths[c.key] || parseInt(c.w, 10);
       return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key +
-        '" tabindex="0" style="width:' + c.w + '">' + c.label + '<span class="arrow">' + arrow + "</span></th>";
+        '" tabindex="0" style="width:' + w + 'px">' + c.label + '<span class="arrow">' + arrow + "</span>" +
+        '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
     }).join("");
 
     var hintEl = document.getElementById("sort-hint");
@@ -1493,7 +1587,7 @@
     renderStats();
   });
 
-  document.getElementById("tbody").addEventListener("click", function (e) {
+  document.getElementById("tbody").addEventListener("click", async function (e) {
     var btn = e.target.closest("button[data-action]");
     if (!btn) return;
     var id = btn.getAttribute("data-id");
@@ -1502,7 +1596,7 @@
     var action = btn.getAttribute("data-action");
     if (action === "view") { openDrawer(id); return; }
     if (action === "delete") {
-      if (confirm("Delete this record? This can't be undone.")) {
+      if (await askConfirm("Delete this record? This can't be undone.")) {
         state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
         localSave();
         deleteFromDb(id);
@@ -1660,9 +1754,41 @@
     if (e.key === "Escape" && vetModal.classList.contains("open")) closeVetModal();
   });
 
-  document.getElementById("d-delete").addEventListener("click", function () {
+  // ---------- Confirm dialog ----------
+  // A custom modal standing in for window.confirm(), which returns false without
+  // showing anything inside this sandboxed artifact frame — the same class of issue
+  // that blocked clipboard-read and window.open query params earlier in this build.
+  var confirmScrim = document.getElementById("confirm-scrim");
+  var confirmModalEl = document.getElementById("confirm-modal");
+  var confirmMessageEl = document.getElementById("confirm-message");
+  var confirmOkBtn = document.getElementById("confirm-ok");
+  var confirmResolve = null;
+
+  function askConfirm(message, okLabel) {
+    confirmMessageEl.textContent = message;
+    confirmOkBtn.textContent = okLabel || "Delete";
+    confirmScrim.classList.add("open");
+    confirmModalEl.classList.add("open");
+    confirmModalEl.setAttribute("aria-hidden", "false");
+    confirmOkBtn.focus();
+    return new Promise(function (resolve) { confirmResolve = resolve; });
+  }
+  function closeConfirm(result) {
+    confirmScrim.classList.remove("open");
+    confirmModalEl.classList.remove("open");
+    confirmModalEl.setAttribute("aria-hidden", "true");
+    if (confirmResolve) { var r = confirmResolve; confirmResolve = null; r(result); }
+  }
+  document.getElementById("confirm-cancel").addEventListener("click", function () { closeConfirm(false); });
+  confirmOkBtn.addEventListener("click", function () { closeConfirm(true); });
+  confirmScrim.addEventListener("click", function () { closeConfirm(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && confirmModalEl.classList.contains("open")) closeConfirm(false);
+  });
+
+  document.getElementById("d-delete").addEventListener("click", async function () {
     if (!state.activeId) return;
-    if (confirm("Delete this record? This can't be undone.")) {
+    if (await askConfirm("Delete this record? This can't be undone.")) {
       var id = state.activeId;
       state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
       localSave();
@@ -1754,10 +1880,10 @@
     if (c) { c[field] = el.value; save(job); }
   });
 
-  document.getElementById("contacts-list").addEventListener("click", function (e) {
+  document.getElementById("contacts-list").addEventListener("click", async function (e) {
     var btn = e.target.closest('button[data-action="rm-contact"]');
     if (!btn) return;
-    if (!confirm("Remove this contact? This can't be undone.")) return;
+    if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
     var job = findJob(state.activeId);
     if (!job) return;
     job.contacts = job.contacts.filter(function (c) { return c.id !== btn.getAttribute("data-cid"); });
@@ -1803,11 +1929,11 @@
       var entry = job[key].find(function (x) { return x.id === eid; });
       if (entry) { entry[field] = el.value; save(job); }
     });
-    list.addEventListener("click", function (e) {
+    list.addEventListener("click", async function (e) {
       var btn = e.target.closest('button[data-action="rm-entry"]');
       if (!btn) return;
       var noun = key === "interviews" ? "interview" : "follow-up";
-      if (!confirm("Remove this " + noun + "? This can't be undone.")) return;
+      if (!(await askConfirm("Remove this " + noun + "? This can't be undone.", "Remove"))) return;
       var job = findJob(state.activeId);
       if (!job) return;
       job[key] = job[key].filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
