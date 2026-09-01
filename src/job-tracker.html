@@ -327,6 +327,17 @@
   tbody tr:hover { background: var(--surface-alt); }
   tbody tr:hover td { background: var(--surface-alt); }
 
+  /* Actions column stays put while the rest of the sheet scrolls horizontally */
+  .actions-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+    box-shadow: 1px 0 0 var(--border-strong);
+  }
+  thead th.actions-col { z-index: 3; background: var(--surface-alt); }
+  tbody tr:hover td.actions-col { background: var(--surface-alt); }
+
   tbody input, tbody select {
     width: 100%;
     border: 1px solid transparent;
@@ -569,6 +580,7 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
   }
   .field textarea { resize: vertical; min-height: 64px; font-family: inherit; line-height: 1.45; }
+  .field textarea.tall { min-height: 140px; }
   .field.checkline { flex-direction: row; align-items: center; gap: 8px; }
   .field.checkline input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
   .field.checkline label { font-size: 0.86rem; color: var(--ink); }
@@ -664,7 +676,8 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
   }
   .paste-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-  #paste-scrim { z-index: 50; }
+  #paste-scrim, #vet-scrim { z-index: 50; }
+  #vet-textarea { min-height: 160px; background: var(--surface-alt); }
 
   .stage-badge {
     font-size: 0.72rem;
@@ -783,6 +796,10 @@
         <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
         <div class="field span-2"><label for="d-companyUrl">Company URL</label><input type="text" id="d-companyUrl" placeholder="https://"></div>
         <div class="field span-2"><label for="d-postingUrl">Job posting link</label><input type="text" id="d-postingUrl" placeholder="https://"></div>
+        <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
+        <div class="field span-2">
+          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
+        </div>
         <div class="field span-2"><label for="d-values">Company values</label><textarea id="d-values" placeholder="Culture, mission, values that stood out"></textarea></div>
       </div>
     </div>
@@ -834,6 +851,17 @@
   <div class="paste-modal-actions">
     <button type="button" id="paste-cancel" class="btn">Cancel</button>
     <button type="button" id="paste-confirm" class="btn btn-primary">Add job</button>
+  </div>
+</div>
+
+<div class="scrim" id="vet-scrim"></div>
+<div class="paste-modal" id="vet-modal" aria-hidden="true" role="dialog" aria-labelledby="vet-modal-title">
+  <h2 id="vet-modal-title">Vet this job with Claude</h2>
+  <p id="vet-modal-hint">A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).</p>
+  <textarea id="vet-textarea" rows="6" readonly></textarea>
+  <div class="paste-modal-actions">
+    <button type="button" id="vet-copy" class="btn">Copy</button>
+    <button type="button" id="vet-close" class="btn btn-primary">Done</button>
   </div>
 </div>
 
@@ -1153,7 +1181,7 @@
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
       dateRejected: "",
-      companyUrl: "", postingUrl: "", values: "", notes: "",
+      companyUrl: "", postingUrl: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
     };
   }
@@ -1345,12 +1373,12 @@
     }
 
     var thead = document.getElementById("thead-row");
-    thead.innerHTML = cols.map(function (c) {
+    thead.innerHTML = '<th class="actions-col" style="width:180px">Actions</th>' + cols.map(function (c) {
       var active = sortCol && sortCol.key === c.key;
       var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
       return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key +
         '" tabindex="0" style="width:' + c.w + '">' + c.label + '<span class="arrow">' + arrow + "</span></th>";
-    }).join("") + '<th style="width:180px">Actions</th>';
+    }).join("");
 
     var hintEl = document.getElementById("sort-hint");
     hintEl.textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
@@ -1387,12 +1415,12 @@
         moveBtns = '<button class="move-btn back" data-action="to-applied" data-id="' + job.id + '">← Applied</button>';
       }
 
-      return '<tr>' + cells +
-        '<td><div class="row-actions">' +
+      return '<tr data-id="' + job.id + '">' +
+        '<td class="actions-col"><div class="row-actions">' +
         '<button class="icon-btn" data-action="view" data-id="' + job.id + '" title="Open record" aria-label="Open record">⤢</button>' +
         moveBtns +
         '<button class="icon-btn danger" data-action="delete" data-id="' + job.id + '" title="Delete" aria-label="Delete">🗑</button>' +
-        "</div></td></tr>";
+        "</div></td>" + cells + "</tr>";
     }).join("");
   }
 
@@ -1493,12 +1521,21 @@
     renderTable();
   });
 
+  // Double-click anywhere in a row (except the Actions cell, which has its own buttons)
+  // opens the full record, same as the ⤢ button.
+  document.getElementById("tbody").addEventListener("dblclick", function (e) {
+    if (e.target.closest(".actions-col")) return;
+    var row = e.target.closest("tr[data-id]");
+    if (!row) return;
+    openDrawer(row.getAttribute("data-id"));
+  });
+
   // ---------- Drawer ----------
   var drawer = document.getElementById("drawer");
   var scrim = document.getElementById("scrim");
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
-    "pto", "medical", "companyUrl", "postingUrl", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
+    "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
@@ -1544,6 +1581,79 @@
   scrim.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+  });
+
+  // ---------- Vet this job with Claude ----------
+  // Opens a new Claude chat and gets the vetting prompt onto the clipboard. claude.ai
+  // doesn't reliably accept a prefilled message via URL, and clipboard writes can be
+  // silently blocked inside an embedded page (same lessons as the bookmarklet above),
+  // so the modal always shows the text pre-selected as a guaranteed manual-copy fallback.
+  var vetScrim = document.getElementById("vet-scrim");
+  var vetModal = document.getElementById("vet-modal");
+  var vetTextarea = document.getElementById("vet-textarea");
+
+  function buildVetPrompt(job) {
+    var lines = ["Vet this job:", ""];
+    var headline = job.position || "Untitled role";
+    if (job.company) headline += " at " + job.company;
+    lines.push(headline);
+    if (job.location) lines.push("Location: " + job.location);
+    if (job.postedSalary) lines.push("Posted salary: " + job.postedSalary);
+    if (job.postingUrl) lines.push("Posting link: " + job.postingUrl);
+    lines.push("");
+    if (job.description) {
+      lines.push("Job description:");
+      lines.push(job.description);
+    } else {
+      lines.push("(No job description saved yet.)");
+    }
+    return lines.join("\n");
+  }
+
+  function closeVetModal() {
+    vetScrim.classList.remove("open");
+    vetModal.classList.remove("open");
+    vetModal.setAttribute("aria-hidden", "true");
+  }
+
+  document.getElementById("vet-btn").addEventListener("click", async function () {
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var prompt = buildVetPrompt(job);
+
+    window.open("https://claude.ai/new", "_blank");
+
+    vetTextarea.value = prompt;
+    vetScrim.classList.add("open");
+    vetModal.classList.add("open");
+    vetModal.setAttribute("aria-hidden", "false");
+    vetTextarea.focus();
+    vetTextarea.select();
+
+    var hint = document.getElementById("vet-modal-hint");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(prompt);
+        hint.textContent = "A new Claude chat just opened, and this has been copied — paste it in there (Cmd/Ctrl+V).";
+      } else {
+        hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
+      }
+    } catch (e) {
+      hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
+    }
+  });
+
+  document.getElementById("vet-copy").addEventListener("click", async function () {
+    vetTextarea.focus();
+    vetTextarea.select();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(vetTextarea.value);
+    } catch (e) { /* selection above still lets Cmd/Ctrl+C work */ }
+  });
+  document.getElementById("vet-close").addEventListener("click", closeVetModal);
+  vetScrim.addEventListener("click", closeVetModal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && vetModal.classList.contains("open")) closeVetModal();
   });
 
   document.getElementById("d-delete").addEventListener("click", function () {
