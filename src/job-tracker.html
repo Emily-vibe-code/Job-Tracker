@@ -915,7 +915,10 @@
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
-        <div class="field span-2"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
+        <div class="field"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
+        <div class="field"><label for="d-rejectionReason">Reason</label>
+          <select id="d-rejectionReason"><option value="">—</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option><option value="Ghosted">Ghosted</option><option value="Pass">Pass</option></select>
+        </div>
       </div>
     </div>
 
@@ -1395,7 +1398,7 @@
       reviewPercent: "", reviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
-      dateRejected: "",
+      dateRejected: "", rejectionReason: "",
       companyUrl: "", postingUrl: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
     };
@@ -1561,7 +1564,7 @@
     { key: "reviewCount", label: "Glassdoor #", type: "number", num: true, w: "100px" },
     { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" },
     { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" },
-    { key: "location", label: "Location", type: "location", w: "118px" },
+    { key: "location", label: "Location", type: "select", options: ["Remote", "Hybrid", "On-site"], selectCls: "loc-select", w: "118px" },
     { key: "pto", label: "PTO", type: "text", w: "120px" },
     { key: "medical", label: "Medical", type: "text", w: "140px" }
   ];
@@ -1571,10 +1574,12 @@
   var COL_WHERE_APPLIED = { key: "whereApplied", label: "Where applied", type: "text", w: "140px" };
   var COL_INTERVIEWING = { key: "interviewing", label: "Interviewing", type: "checkbox", w: "96px" };
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" };
+  var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
+  var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
 
   var COLS_JOBS = BASE_COLS.concat([COL_DATE_APPLIED, COL_INTERVIEWING]);
   var COLS_APPLIED = BASE_COLS.concat([COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING]);
-  var COLS_REJECTED = COLS_APPLIED.concat([COL_DATE_REJECTED]);
+  var COLS_REJECTED = COLS_APPLIED.concat([COL_DATE_REJECTED, COL_REJECTION_REASON]);
   var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, interviewing: COLS_APPLIED, rejected: COLS_REJECTED };
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
 
@@ -1749,11 +1754,11 @@
     if (col.type === "checkbox") {
       return '<div class="chk-cell"><input type="checkbox" data-id="' + job.id + '" data-field="' + col.key + '" ' + (job[col.key] ? "checked" : "") + '></div>';
     }
-    if (col.type === "location") {
-      var opts = ["Remote", "Hybrid", "On-site"].map(function (o) {
-        return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + o + "</option>";
+    if (col.type === "select") {
+      var opts = col.options.map(function (o) {
+        return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + escapeHtml(o || "—") + "</option>";
       }).join("");
-      return '<select class="loc-select" data-id="' + job.id + '" data-field="location">' + opts + "</select>";
+      return '<select class="' + (col.selectCls || "") + '" data-id="' + job.id + '" data-field="' + col.key + '">' + opts + "</select>";
     }
     var type = col.type === "number" ? "number" : (col.type === "date" ? "date" : "text");
     var esc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -2164,7 +2169,8 @@
   var scrim = document.getElementById("scrim");
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
-    "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied", "dateRejected", "notes"];
+    "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied",
+    "dateRejected", "rejectionReason", "notes"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
@@ -2456,7 +2462,7 @@
       if (moved) renderTable();
       return;
     }
-    if ((e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
+    if ((e.target.id === "d-location" || e.target.id === "d-rejectionReason" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
       save(job, true);
     }
   });
