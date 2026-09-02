@@ -890,8 +890,10 @@
         <div class="field"><label for="d-location">Location</label>
           <select id="d-location"><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option><option value="On-site">On-site</option></select>
         </div>
-        <div class="field"><label for="d-reviewPercent">Rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
-        <div class="field"><label for="d-reviewCount">Reviews</label><input type="text" inputmode="numeric" id="d-reviewCount"></div>
+        <div class="field"><label for="d-reviewPercent">G Rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
+        <div class="field"><label for="d-reviewCount">G Reviews</label><input type="text" inputmode="numeric" id="d-reviewCount"></div>
+        <div class="field"><label for="d-indeedRating">I Ratings (out of 5)</label><input type="number" id="d-indeedRating" min="0" max="5" step="0.1"></div>
+        <div class="field"><label for="d-indeedReviewCount">I Reviews</label><input type="text" inputmode="numeric" id="d-indeedReviewCount"></div>
         <div class="field"><label for="d-postedSalary">Posted salary</label><input type="text" id="d-postedSalary" placeholder="e.g. $110k – $130k"></div>
         <div class="field"><label for="d-salaryAsk">Salary ask</label><input type="text" id="d-salaryAsk" placeholder="e.g. $125k"></div>
         <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
@@ -1461,7 +1463,7 @@
     return {
       id: uid(), stage: "jobs", createdAt: Date.now(),
       date: "", position: "", company: "",
-      reviewPercent: "", reviewCount: "", postedSalary: "", salaryAsk: "",
+      reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
       dateRejected: "", rejectionReason: "", dealbreakers: "",
@@ -1665,8 +1667,10 @@
   var COL_POSTED = { key: "date", label: "Posted", type: "date", w: "112px" };
   var COL_POSITION = { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" };
   var COL_COMPANY = { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" };
-  var COL_RATING = { key: "reviewPercent", label: "Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
-  var COL_REVIEWS = { key: "reviewCount", label: "Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_RATING = { key: "reviewPercent", label: "G Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
+  var COL_REVIEWS = { key: "reviewCount", label: "G Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_INDEED_RATING = { key: "indeedRating", label: "I Ratings", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
+  var COL_INDEED_REVIEWS = { key: "indeedReviewCount", label: "I Reviews", type: "number", commaFormat: true, w: "100px" };
   var COL_POSTED_SALARY = { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" };
   var COL_SALARY_ASK = { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" };
   var COL_LOCATION = { key: "location", label: "Location", type: "select", options: ["Remote", "Hybrid", "On-site"], selectCls: "loc-select", w: "118px" };
@@ -1679,16 +1683,21 @@
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
-  var COLS_JOBS = [COL_POSTED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_JOBS = [COL_POSTED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
   var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED];
-  var COLS_INTERVIEWING_TAIL = [COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_INTERVIEWING_TAIL = [COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_POSITION, COL_COMPANY, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
   var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
+  // Comma-grouped counts (G Reviews, I Reviews) and out-of-5 ratings (G Rating,
+  // I Ratings) share their formatting/highlight behavior across both the table and
+  // the drawer — these lists are the single source of truth for which fields get it.
+  var COMMA_FIELDS = ["reviewCount", "indeedReviewCount"];
+  var LOW_RATING_FIELDS = ["reviewPercent", "indeedRating"];
 
   // One column per interview actually logged across the jobs shown on the
   // Interviewing tab, plus always at least one (per spec, even with zero interviews
@@ -1979,7 +1988,7 @@
     if (col.min !== undefined) extra += ' min="' + col.min + '"';
     if (col.max !== undefined) extra += ' max="' + col.max + '"';
     if (col.step !== undefined) extra += ' step="' + col.step + '"';
-    var cls = col.key === "reviewPercent" && isLowRating(v) ? ' class="low-rating"' : "";
+    var cls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? ' class="low-rating"' : "";
     return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
       '"' + cls + extra + NO_ASSIST_ATTRS + '>';
   }
@@ -2241,7 +2250,7 @@
     flushPendingWrites();
     flushPendingContactWrites();
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
-    if (field === "reviewCount") {
+    if (field && COMMA_FIELDS.indexOf(field) !== -1) {
       e.target.value = formatWithCommas(e.target.value);
     } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field))) {
       // Back to a plain text cell showing just month/day — the full value (year
@@ -2259,7 +2268,7 @@
   document.getElementById("tbody").addEventListener("focus", function (e) {
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
     var interviewMatch = field && /^interview_(\d+)$/.exec(field);
-    if (field === "reviewCount") {
+    if (field && COMMA_FIELDS.indexOf(field) !== -1) {
       e.target.value = stripCommas(e.target.value);
     } else if (field && DATE_COL_KEYS.indexOf(field) !== -1) {
       var id = e.target.getAttribute("data-id");
@@ -2379,9 +2388,9 @@
       return;
     }
     if (el.type === "checkbox") job[field] = el.checked;
-    else if (field === "reviewCount") { el.value = stripCommas(el.value); job[field] = el.value; }
+    else if (COMMA_FIELDS.indexOf(field) !== -1) { el.value = stripCommas(el.value); job[field] = el.value; }
     else job[field] = el.value;
-    if (field === "reviewPercent") el.classList.toggle("low-rating", isLowRating(el.value));
+    if (LOW_RATING_FIELDS.indexOf(field) !== -1) el.classList.toggle("low-rating", isLowRating(el.value));
     if (field === "postingUrl") {
       var openLink = el.closest("td").querySelector("a.icon-btn");
       if (openLink) {
@@ -2444,7 +2453,7 @@
   var drawer = document.getElementById("drawer");
   var scrim = document.getElementById("scrim");
 
-  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
+  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied",
     "dateRejected", "rejectionReason", "dealbreakers"];
 
@@ -2471,10 +2480,13 @@
     document.getElementById("d-company").value = job.company || "";
     SIMPLE_FIELDS.forEach(function (f) {
       var el = document.getElementById("d-" + f);
-      if (el) el.value = f === "reviewCount" ? formatWithCommas(job[f]) : (job[f] || "");
+      if (el) el.value = COMMA_FIELDS.indexOf(f) !== -1 ? formatWithCommas(job[f]) : (job[f] || "");
     });
     document.getElementById("d-interviewing").checked = !!job.interviewing;
-    document.getElementById("d-reviewPercent").classList.toggle("low-rating", isLowRating(job.reviewPercent));
+    LOW_RATING_FIELDS.forEach(function (f) {
+      var el = document.getElementById("d-" + f);
+      if (el) el.classList.toggle("low-rating", isLowRating(job[f]));
+    });
     updateDealbreakersVisibility(job);
     urlFieldSyncs["d-companyUrl"]();
     urlFieldSyncs["d-postingUrl"]();
@@ -2743,19 +2755,19 @@
     }
     var m = el.id.match(/^d-(.+)$/);
     if (m && SIMPLE_FIELDS.indexOf(m[1]) !== -1) {
-      if (m[1] === "reviewCount") el.value = stripCommas(el.value);
+      if (COMMA_FIELDS.indexOf(m[1]) !== -1) el.value = stripCommas(el.value);
       job[m[1]] = el.value;
-      if (m[1] === "reviewPercent") el.classList.toggle("low-rating", isLowRating(el.value));
+      if (LOW_RATING_FIELDS.indexOf(m[1]) !== -1) el.classList.toggle("low-rating", isLowRating(el.value));
       save(job);
     }
   });
   document.getElementById("drawer").addEventListener("focus", function (e) {
-    if (e.target.id === "d-reviewCount") e.target.value = stripCommas(e.target.value);
+    if (COMMA_FIELDS.indexOf(e.target.id.replace(/^d-/, "")) !== -1) e.target.value = stripCommas(e.target.value);
   }, true);
   document.getElementById("drawer").addEventListener("blur", function (e) {
     var job = state.activeId && findJob(state.activeId);
     if (job && (e.target.id === "d-position" || e.target.id === "d-company")) save(job, true);
-    if (e.target.id === "d-reviewCount") e.target.value = formatWithCommas(e.target.value);
+    if (COMMA_FIELDS.indexOf(e.target.id.replace(/^d-/, "")) !== -1) e.target.value = formatWithCommas(e.target.value);
   }, true);
   document.getElementById("drawer").addEventListener("change", function (e) {
     var job = state.activeId && findJob(state.activeId);
