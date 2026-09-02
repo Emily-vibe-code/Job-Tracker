@@ -1977,6 +1977,15 @@
     return m ? m[2] + "/" + m[3] : "";
   }
 
+  // Live-formats a phone number to ###-###-#### as it's typed, from whatever
+  // digits are present (pasted, typed, with or without punctuation).
+  function formatPhoneNumber(v) {
+    var digits = String(v || "").replace(/\D/g, "").slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return digits.slice(0, 3) + "-" + digits.slice(3);
+    return digits.slice(0, 3) + "-" + digits.slice(3, 6) + "-" + digits.slice(6);
+  }
+
   // Sets interviews[idx].date, creating that entry (and padding any earlier missing
   // ones with blanks so indices stay meaningful) if it doesn't exist yet — lets the
   // Interviewing tab's "Interview"/"Interview N" columns double as a quick way to log
@@ -2386,6 +2395,7 @@
     if (!cid || !field) return;
     var c = findContact(cid);
     if (!c) return;
+    if (field === "phone") el.value = formatPhoneNumber(el.value);
     c[field] = el.value;
     saveContact(c, false);
     if (field === "linkedin") {
@@ -2722,7 +2732,10 @@
   document.getElementById("cd-connection").addEventListener("input", function (e) { saveActiveContactField("connection", e.target.value); });
   document.getElementById("cd-notes").addEventListener("input", function (e) { saveActiveContactField("notes", e.target.value); });
   CD_FIELDS.forEach(function (f) {
-    document.getElementById("cd-" + f).addEventListener("input", function (e) { saveActiveContactField(f, e.target.value); });
+    document.getElementById("cd-" + f).addEventListener("input", function (e) {
+      if (f === "phone") e.target.value = formatPhoneNumber(e.target.value);
+      saveActiveContactField(f, e.target.value);
+    });
   });
 
   document.getElementById("cd-delete").addEventListener("click", async function () {
@@ -2974,7 +2987,10 @@
     var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
     if (!cid || !field) return;
     var c = findContact(cid);
-    if (c) { c[field] = el.value; saveContact(c, false); }
+    if (!c) return;
+    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    c[field] = el.value;
+    saveContact(c, false);
   });
 
   document.getElementById("contacts-list").addEventListener("click", async function (e) {
