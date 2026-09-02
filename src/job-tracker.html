@@ -1129,7 +1129,12 @@
     if (!Array.isArray(j.contacts)) j.contacts = [];
     if (!Array.isArray(j.interviews)) j.interviews = [];
     if (!Array.isArray(j.followups)) j.followups = [];
-    return j;
+    // The db capability hands back snapshot data that's frozen (non-extensible), to stop
+    // callers from mutating its cache. Fields copied straight from `data` above (like these
+    // arrays) carry that freeze with them, so `.push()` on job.interviews/followups/contacts
+    // for any cloud-loaded job throws "object is not extensible" — this deep clone guarantees
+    // everything on `j` is a fresh, mutable copy no matter what the SDK gave us.
+    return JSON.parse(JSON.stringify(j));
   }
 
   function save(job, immediate) {
@@ -1543,7 +1548,9 @@
       if (data && data[k] !== undefined) c[k] = data[k];
     });
     if (data && data.id) c.id = data.id;
-    return c;
+    // Same frozen-snapshot issue as normalizeJob() — clone so nothing non-extensible
+    // survives onto the working copy.
+    return JSON.parse(JSON.stringify(c));
   }
 
   // One-time (idempotent) upgrade path: older records kept contacts nested inside
