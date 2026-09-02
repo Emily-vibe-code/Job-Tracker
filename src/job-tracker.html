@@ -891,7 +891,7 @@
         <div class="field span-2">
           <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
         </div>
-        <div class="field span-2"><label for="d-values">Company values</label><textarea id="d-values" placeholder="Culture, mission, values that stood out"></textarea></div>
+        <div class="field span-2"><label for="d-values">General notes</label><textarea id="d-values" placeholder="Culture, values, or anything else worth remembering about this one"></textarea></div>
       </div>
     </div>
 
@@ -926,10 +926,6 @@
       <button class="ghost-btn" id="add-followup" type="button" style="margin-top:8px;">+ Add follow-up</button>
     </div>
 
-    <div class="section">
-      <p class="section-title">General notes</p>
-      <textarea id="d-notes" style="width:100%; min-height:100px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Anything else worth remembering about this one"></textarea>
-    </div>
   </div>
   <div class="drawer-foot">
     <span class="stage-badge" id="d-stage-badge">Jobs</span>
@@ -1212,6 +1208,7 @@
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
     migrateEmbeddedContacts();
+    migrateValuesNotes();
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
       if (isSyncSensitive()) return; // don't clobber an in-progress (or not-yet-confirmed) edit
@@ -1219,6 +1216,7 @@
       state.jobs = jobs;
       localSave();
       migrateEmbeddedContacts();
+      migrateValuesNotes();
       renderTable();
     }, function () {
       setSyncStatus("off", "Sync paused — changes are saved on this device");
@@ -1565,9 +1563,30 @@
     }
   }
 
+  // One-time (idempotent) upgrade path: Company values and General notes used to be
+  // two separate fields; the drawer now has just one ("General notes", stored under
+  // the same `values` key values already used). Any job still carrying old `notes`
+  // content gets it folded into `values` and `notes` cleared, so nothing entered in
+  // either field is lost.
+  function migrateValuesNotes() {
+    var touched = [];
+    state.jobs.forEach(function (job) {
+      if (job.notes) {
+        job.values = job.values ? (job.values + "\n\n" + job.notes) : job.notes;
+        job.notes = "";
+        touched.push(job);
+      }
+    });
+    if (touched.length) {
+      localSave();
+      touched.forEach(function (j) { save(j, true); });
+    }
+  }
+
   state.jobs = load();
   state.contacts = loadContacts();
   migrateEmbeddedContacts();
+  migrateValuesNotes();
   state.colWidths = loadColWidths();
 
   // ---------- Column definitions per stage ----------
@@ -2263,7 +2282,7 @@
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied",
-    "dateRejected", "rejectionReason", "notes"];
+    "dateRejected", "rejectionReason"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
