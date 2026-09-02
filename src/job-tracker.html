@@ -1633,7 +1633,7 @@
     { key: "date", label: "Date", type: "date", w: "112px" },
     { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
     { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" },
-    { key: "reviewPercent", label: "Rating", type: "number", num: true, min: 0, max: 5, step: 0.1, w: "116px" },
+    { key: "reviewPercent", label: "Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" },
     { key: "reviewCount", label: "Reviews", type: "number", commaFormat: true, w: "100px" },
     { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" },
     { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" },
@@ -1850,7 +1850,7 @@
     }
     var type = col.commaFormat ? "text" : (col.type === "number" ? "number" : (col.type === "date" ? "date" : "text"));
     var esc = String(col.commaFormat ? formatWithCommas(v) : v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-    var extra = col.commaFormat ? ' inputmode="numeric"' : (col.num ? ' inputmode="decimal"' : "");
+    var extra = col.commaFormat ? ' inputmode="numeric"' : (col.type === "number" ? ' inputmode="decimal"' : "");
     if (col.min !== undefined) extra += ' min="' + col.min + '"';
     if (col.max !== undefined) extra += ' max="' + col.max + '"';
     if (col.step !== undefined) extra += ' step="' + col.step + '"';
