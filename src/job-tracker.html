@@ -888,9 +888,6 @@
           <div class="url-input-row"><input type="text" id="d-postingUrl" placeholder="https://"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
         </div>
         <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
-        <div class="field span-2">
-          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
-        </div>
         <div class="field span-2"><label for="d-values">General notes</label><textarea id="d-values" placeholder="Culture, values, or anything else worth remembering about this one"></textarea></div>
       </div>
     </div>
@@ -904,6 +901,9 @@
         <div class="field"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
         <div class="field"><label for="d-rejectionReason">Reason</label>
           <select id="d-rejectionReason"><option value="">—</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option><option value="Ghosted">Ghosted</option><option value="Pass">Pass</option></select>
+        </div>
+        <div class="field span-2">
+          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
         </div>
       </div>
     </div>
