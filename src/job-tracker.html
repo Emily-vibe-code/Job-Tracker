@@ -2195,6 +2195,17 @@
     return false;
   }
 
+  // Filling in "Date rejected" from any tab moves the record to Rejected — the same
+  // symmetry Date Applied already has, so a job entered with both dates set doesn't
+  // end up stranded in Applied with no visible move to Rejected.
+  function applyDateRejectedAutoMove(job) {
+    if (job.dateRejected && job.stage !== "rejected") {
+      job.stage = "rejected";
+      return true;
+    }
+    return false;
+  }
+
   // Delegated input/change handling for inline editing (avoids full re-render per keystroke)
   document.getElementById("tbody").addEventListener("input", function (e) {
     var el = e.target;
@@ -2572,6 +2583,13 @@
       updateStageBadge(job);
       save(job, true);
       if (moved) renderTable();
+      return;
+    }
+    if (e.target.id === "d-dateRejected") {
+      var movedR = applyDateRejectedAutoMove(job);
+      updateStageBadge(job);
+      save(job, true);
+      if (movedR) renderTable();
       return;
     }
     if ((e.target.id === "d-location" || e.target.id === "d-rejectionReason" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
