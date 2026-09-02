@@ -204,6 +204,16 @@
     color: var(--ink-muted);
   }
 
+  /* While a search is active, every tab's count badge switches from its normal
+     total to a match count for that tab — highlighted so it reads as "results
+     here" rather than being mistaken for the usual total. */
+  .tab .count.match-count {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-soft-ink);
+    font-weight: 700;
+  }
+
   .tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
   /* ---------- Table shell ---------- */
@@ -2013,11 +2023,25 @@
     ].map(function (s) {
       return '<div class="stat"><span class="n">' + s[1] + '</span><span class="l">' + s[0] + '</span></div>';
     }).join("");
-    document.getElementById("count-jobs").textContent = jobs;
-    document.getElementById("count-applied").textContent = applied;
-    document.getElementById("count-interviewing").textContent = interviewing;
-    document.getElementById("count-rejected").textContent = rejected;
-    document.getElementById("count-contacts").textContent = getAllContacts().length;
+    // While a search is active, each tab's count badge shows how many results
+    // are actually waiting there instead of its usual total — so a match sitting
+    // in a tab you're not on doesn't go unnoticed (see the conversation that
+    // prompted this: a company split across Applied and Rejected as two records).
+    var searching = !!state.search.trim();
+    var q = searching ? state.search.trim().toLowerCase() : "";
+    function setCount(id, stage, total) {
+      var el = document.getElementById(id);
+      var matchCount = stage === "contacts"
+        ? getAllContacts().filter(function (c) { return contactMatchesQuery(c, q); }).length
+        : state.jobs.filter(function (j) { return j.stage === stage && jobMatchesQuery(j, q); }).length;
+      el.textContent = searching ? matchCount : total;
+      el.classList.toggle("match-count", searching && matchCount > 0);
+    }
+    setCount("count-jobs", "jobs", jobs);
+    setCount("count-applied", "applied", applied);
+    setCount("count-interviewing", "interviewing", interviewing);
+    setCount("count-rejected", "rejected", rejected);
+    setCount("count-contacts", "contacts", getAllContacts().length);
   }
 
   function cellHtml(job, col) {
