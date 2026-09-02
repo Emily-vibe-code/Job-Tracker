@@ -1064,12 +1064,25 @@
     try { localStorage.setItem(COLWIDTH_KEY, JSON.stringify(state.colWidths)); } catch (e) { /* per-device preference only; safe to skip */ }
   }
 
+  // Jobs saved before an array-shaped field existed (or round-tripped through a
+  // store that turns an empty array into `{}`) can load with contacts/interviews/
+  // followups missing or non-array — which silently breaks every "+ Add" button
+  // for that record, since `.push()` on a non-array throws. normalizeJob() already
+  // guards this for cloud-loaded jobs; apply the same guard here so a job loaded
+  // straight from localStorage gets it too.
+  function ensureEntryArrays(job) {
+    if (!Array.isArray(job.contacts)) job.contacts = [];
+    if (!Array.isArray(job.interviews)) job.interviews = [];
+    if (!Array.isArray(job.followups)) job.followups = [];
+    return job;
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.jobs)) return parsed.jobs;
+        if (parsed && Array.isArray(parsed.jobs)) return parsed.jobs.map(ensureEntryArrays);
       }
     } catch (e) { /* ignore corrupted storage */ }
     return [];
@@ -2627,26 +2640,46 @@
     }).join("");
   }
 
+  // Surfaces an unexpected failure right under the list instead of failing silently
+  // (this is what let the "old jobs can't add an interview" bug hide from us).
+  function showEntryError(addBtnId, err) {
+    var btn = document.getElementById(addBtnId);
+    if (!btn) return;
+    var msg = document.getElementById(addBtnId + "-error");
+    if (!msg) {
+      msg = document.createElement("p");
+      msg.id = addBtnId + "-error";
+      msg.style.cssText = "margin:6px 0 0; font-size:0.78rem; color:var(--danger);";
+      btn.insertAdjacentElement("afterend", msg);
+    }
+    msg.textContent = "Couldn't save that — " + (err && err.message ? err.message : String(err));
+  }
+
   function bindEntrySection(key, listId, addBtnId) {
     document.getElementById(addBtnId).addEventListener("click", function () {
-      var job = findJob(state.activeId);
-      if (!job) return;
-      if (!Array.isArray(job[key])) job[key] = [];
-      job[key].push({ id: uid(), date: "", notes: "" });
-      save(job, true);
-      renderEntries(job, key, listId);
-      var newCard = document.querySelector("#" + listId + " .card:last-child");
-      if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      try {
+        var job = findJob(state.activeId);
+        if (!job) return;
+        if (!Array.isArray(job[key])) job[key] = [];
+        job[key].push({ id: uid(), date: "", notes: "" });
+        save(job, true);
+        renderEntries(job, key, listId);
+        var newCard = document.querySelector("#" + listId + " .card:last-child");
+        if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (err) { showEntryError(addBtnId, err); }
     });
     var list = document.getElementById(listId);
     list.addEventListener("input", function (e) {
-      var el = e.target;
-      var eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
-      if (!eid || !field) return;
-      var job = findJob(state.activeId);
-      if (!job) return;
-      var entry = job[key].find(function (x) { return x.id === eid; });
-      if (entry) { entry[field] = el.value; save(job); }
+      try {
+        var el = e.target;
+        var eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
+        if (!eid || !field) return;
+        var job = findJob(state.activeId);
+        if (!job) return;
+        if (!Array.isArray(job[key])) job[key] = [];
+        var entry = job[key].find(function (x) { return x.id === eid; });
+        if (entry) { entry[field] = el.value; save(job); }
+      } catch (err) { showEntryError(addBtnId, err); }
     });
     list.addEventListener("click", async function (e) {
       var btn = e.target.closest('button[data-action="rm-entry"]');
