@@ -907,15 +907,25 @@
     <div class="section">
       <p class="section-title">Application</p>
       <div class="field-grid">
+        <div class="field span-2">
+          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
+        </div>
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Rejected</p>
+      <div class="field-grid">
         <div class="field"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
         <div class="field"><label for="d-rejectionReason">Reason</label>
           <select id="d-rejectionReason"><option value="">—</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option><option value="Ghosted">Ghosted</option><option value="Pass">Pass</option></select>
         </div>
-        <div class="field span-2">
-          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
+        <div class="field span-2" id="dealbreakers-field" style="display:none;">
+          <label for="d-dealbreakers">Dealbreakers</label>
+          <textarea id="d-dealbreakers" placeholder="What made this a pass?"></textarea>
         </div>
       </div>
     </div>
@@ -1446,7 +1456,7 @@
       reviewPercent: "", reviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
-      dateRejected: "", rejectionReason: "",
+      dateRejected: "", rejectionReason: "", dealbreakers: "",
       companyUrl: "", postingUrl: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
     };
@@ -2294,12 +2304,20 @@
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied",
-    "dateRejected", "rejectionReason"];
+    "dateRejected", "rejectionReason", "dealbreakers"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
     badge.textContent = STAGE_LABEL[job.stage];
     badge.className = "stage-badge stage-" + job.stage;
+  }
+
+  // "Dealbreakers" only makes sense when the rejection was a Pass (you turned it
+  // down), so it stays hidden the rest of the time instead of cluttering every
+  // rejected record.
+  function updateDealbreakersVisibility(job) {
+    var wrap = document.getElementById("dealbreakers-field");
+    if (wrap) wrap.style.display = job.rejectionReason === "Pass" ? "" : "none";
   }
 
   function openDrawer(id) {
@@ -2315,6 +2333,7 @@
     });
     document.getElementById("d-interviewing").checked = !!job.interviewing;
     document.getElementById("d-reviewPercent").classList.toggle("low-rating", isLowRating(job.reviewPercent));
+    updateDealbreakersVisibility(job);
     urlFieldSyncs["d-companyUrl"]();
     urlFieldSyncs["d-postingUrl"]();
 
@@ -2600,7 +2619,12 @@
       if (movedR) renderTable();
       return;
     }
-    if ((e.target.id === "d-location" || e.target.id === "d-rejectionReason" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
+    if (e.target.id === "d-rejectionReason") {
+      updateDealbreakersVisibility(job);
+      save(job, true);
+      return;
+    }
+    if ((e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
       save(job, true);
     }
   });
