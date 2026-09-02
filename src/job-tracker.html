@@ -1775,11 +1775,7 @@
   document.getElementById("add-btn").addEventListener("click", function () {
     var job = blankJob();
     job.stage = state.activeStage;
-    if (state.activeStage === "applied" && !job.dateApplied) job.dateApplied = todayStr();
-    if (state.activeStage === "interviewing") {
-      job.dateApplied = job.dateApplied || todayStr();
-      job.interviewing = true;
-    }
+    if (state.activeStage === "interviewing") job.interviewing = true;
     if (state.activeStage === "rejected" && !job.dateRejected) job.dateRejected = todayStr();
     state.jobs.push(job);
     save(job, true);
