@@ -149,6 +149,11 @@
     color: var(--ink-muted);
   }
 
+  .global-search {
+    margin-bottom: 14px;
+  }
+  .global-search .search-field { width: min(360px, 100%); }
+
   /* ---------- Tabs ---------- */
   .tabs {
     display: flex;
@@ -829,6 +834,14 @@
     <div class="stats" id="stats"></div>
   </header>
 
+  <div class="global-search">
+    <div class="search-field">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input type="text" id="search-input" placeholder="Search all jobs and contacts by company or name">
+      <button type="button" id="search-clear" aria-label="Clear search">✕</button>
+    </div>
+  </div>
+
   <nav class="tabs" role="tablist" aria-label="Job tracker stages">
     <button class="tab" role="tab" data-stage="jobs" aria-selected="true">Jobs <span class="count" id="count-jobs">0</span></button>
     <button class="tab" role="tab" data-stage="applied" aria-selected="false">Applied <span class="count" id="count-applied">0</span></button>
@@ -839,11 +852,6 @@
 
   <div class="sheet">
     <div class="toolbar">
-      <div class="search-field">
-        <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <input type="text" id="search-input" placeholder="Search by company name">
-        <button type="button" id="search-clear" aria-label="Clear search">✕</button>
-      </div>
       <span class="sort-hint" id="sort-hint"></span>
     </div>
     <div class="sheet-scroll">
@@ -1713,7 +1721,32 @@
     if (savedTab && validStages.indexOf(savedTab) !== -1) selectTab(savedTab, { skipSave: true });
   } catch (e) { /* default tab stands */ }
 
-  // ---------- Search ----------
+  // ---------- Search (global — searches every tab, not just the active one) ----------
+  function jobMatchesQuery(job, q) {
+    return (job.company || "").toLowerCase().indexOf(q) !== -1;
+  }
+  function contactMatchesQuery(contact, q) {
+    var job = contact.jobId ? findJob(contact.jobId) : null;
+    return (contact.name || "").toLowerCase().indexOf(q) !== -1 ||
+      (job && (job.company || "").toLowerCase().indexOf(q) !== -1);
+  }
+  var SEARCH_STAGE_ORDER = ["jobs", "applied", "interviewing", "rejected", "contacts"];
+  function stageHasMatch(stage, q) {
+    if (stage === "contacts") return state.contacts.some(function (c) { return contactMatchesQuery(c, q); });
+    return state.jobs.some(function (j) { return j.stage === stage && jobMatchesQuery(j, q); });
+  }
+  // Stays on the current tab if it already has a match (so typing doesn't yank you
+  // away from results you can already see); otherwise jumps to the first tab, in
+  // display order, that has one. If nothing anywhere matches, stays put and lets
+  // the current tab's own empty state explain that.
+  function pickStageForSearch(q) {
+    if (stageHasMatch(state.activeStage, q)) return state.activeStage;
+    for (var i = 0; i < SEARCH_STAGE_ORDER.length; i++) {
+      if (stageHasMatch(SEARCH_STAGE_ORDER[i], q)) return SEARCH_STAGE_ORDER[i];
+    }
+    return state.activeStage;
+  }
+
   var searchInput = document.getElementById("search-input");
   var searchField = document.querySelector(".search-field");
   document.getElementById("search-clear").addEventListener("click", function () {
@@ -1726,6 +1759,14 @@
   searchInput.addEventListener("input", function () {
     state.search = searchInput.value;
     searchField.classList.toggle("has-value", !!state.search);
+    var q = state.search.trim().toLowerCase();
+    if (q) {
+      var targetStage = pickStageForSearch(q);
+      if (targetStage !== state.activeStage) {
+        selectTab(targetStage);
+        state.sortKey = null;
+      }
+    }
     renderTable();
   });
 
@@ -1933,7 +1974,6 @@
 
     document.getElementById("add-row").style.display = stage === "contacts" ? "none" : "flex";
     document.getElementById("contacts-add-row").style.display = stage === "contacts" ? "flex" : "none";
-    document.getElementById("search-input").placeholder = stage === "contacts" ? "Search by name or company" : "Search by company name";
 
     if (stage === "contacts") { renderContactsTab(); return; }
 
@@ -1943,7 +1983,7 @@
     var searching = !!state.search.trim();
     if (searching) {
       var q = state.search.trim().toLowerCase();
-      rows = rows.filter(function (j) { return (j.company || "").toLowerCase().indexOf(q) !== -1; });
+      rows = rows.filter(function (j) { return jobMatchesQuery(j, q); });
     }
 
     var sortCol = state.sortKey ? cols.filter(function (c) { return c.key === state.sortKey; })[0] : null;
@@ -2070,11 +2110,7 @@
     var searching = !!state.search.trim();
     if (searching) {
       var q = state.search.trim().toLowerCase();
-      entries = entries.filter(function (c) {
-        var job = c.jobId ? findJob(c.jobId) : null;
-        return (c.name || "").toLowerCase().indexOf(q) !== -1 ||
-          (job && (job.company || "").toLowerCase().indexOf(q) !== -1);
-      });
+      entries = entries.filter(function (c) { return contactMatchesQuery(c, q); });
     }
 
     var sortCol = state.sortKey ? CONTACT_COLS.filter(function (c) { return c.key === state.sortKey; })[0] : null;
