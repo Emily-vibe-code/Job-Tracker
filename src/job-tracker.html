@@ -1988,16 +1988,25 @@
   }
 
   // ---------- Table rendering ----------
+  // The Rejected stat splits into two by rejection reason rather than one bucket
+  // for the whole stage: "Rejected" covers an actual rejection or a ghosting,
+  // "Pass" covers turning it down yourself (Pass) or backing out (Withdrawn).
+  var REJECTED_STAT_REASONS = ["Rejected", "Ghosted"];
+  var PASS_STAT_REASONS = ["Pass", "Withdrawn"];
+
   function renderStats() {
     var jobs = state.jobs.filter(function (j) { return j.stage === "jobs"; }).length;
     var applied = state.jobs.filter(function (j) { return j.stage === "applied"; }).length;
     var interviewing = state.jobs.filter(function (j) { return j.stage === "interviewing"; }).length;
     var rejected = state.jobs.filter(function (j) { return j.stage === "rejected"; }).length;
+    var rejectedCount = state.jobs.filter(function (j) { return j.stage === "rejected" && REJECTED_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
+    var passCount = state.jobs.filter(function (j) { return j.stage === "rejected" && PASS_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
     document.getElementById("stats").innerHTML = [
       ["Tracking", jobs + applied + interviewing + rejected],
       ["Applied", applied],
       ["Interviewing", interviewing],
-      ["Rejected", rejected]
+      ["Rejected", rejectedCount],
+      ["Pass", passCount]
     ].map(function (s) {
       return '<div class="stat"><span class="n">' + s[1] + '</span><span class="l">' + s[0] + '</span></div>';
     }).join("");
