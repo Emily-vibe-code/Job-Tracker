@@ -1658,42 +1658,62 @@
       '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + cid + '" title="Delete" aria-label="Delete">🗑</button>';
   }
 
-  var BASE_COLS = [
-    { key: "date", label: "Posted", type: "date", w: "112px" },
-    { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" },
-    { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" },
-    { key: "reviewPercent", label: "Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" },
-    { key: "reviewCount", label: "Reviews", type: "number", commaFormat: true, w: "100px" },
-    { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" },
-    { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" },
-    { key: "location", label: "Location", type: "select", options: ["Remote", "Hybrid", "On-site"], selectCls: "loc-select", w: "118px" },
-    { key: "pto", label: "PTO", type: "text", w: "120px" },
-    { key: "medical", label: "Medical", type: "text", w: "140px" }
-  ];
-  // Shared so entering a value moves the record forward from any tab that shows it
-  // (Jobs, Applied, Interviewing, Rejected) — see applyDateAppliedAutoMove / applyInterviewingToggle.
+  // Each tab shows a different, explicit subset of columns — no shared "base" set,
+  // since e.g. Salary ask belongs on Applied/Interviewing but not Jobs, and Rejected
+  // drops most fields entirely. Column defs are individually named so each COLS_*
+  // array below just lists exactly what that tab wants, in order.
+  var COL_POSTED = { key: "date", label: "Posted", type: "date", w: "112px" };
+  var COL_POSITION = { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" };
+  var COL_COMPANY = { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" };
+  var COL_RATING = { key: "reviewPercent", label: "Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
+  var COL_REVIEWS = { key: "reviewCount", label: "Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_POSTED_SALARY = { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" };
+  var COL_SALARY_ASK = { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" };
+  var COL_LOCATION = { key: "location", label: "Location", type: "select", options: ["Remote", "Hybrid", "On-site"], selectCls: "loc-select", w: "118px" };
+  var COL_PTO = { key: "pto", label: "PTO", type: "text", w: "120px" };
+  var COL_MEDICAL = { key: "medical", label: "Medical", type: "text", w: "140px" };
+  var COL_POSTING_URL = { key: "postingUrl", label: "Job posting link", type: "url", cls: "linkedin-cell", w: "170px" };
   var COL_DATE_APPLIED = { key: "dateApplied", label: "Applied", type: "date", w: "116px" };
-  var COL_WHERE_APPLIED = { key: "whereApplied", label: "Where applied", type: "text", w: "140px" };
-  var COL_INTERVIEWING = { key: "interviewing", label: "Interviewing", type: "checkbox", w: "96px" };
-  var COL_DATE_REJECTED = { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" };
+  var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
-  // Rejected-tab only, same as Reason — most jobs are never a Pass, so this stays out
-  // of every other tab's columns rather than being an empty column everywhere.
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
-  // Applied sits right after Posted (2nd column overall, after the pinned Actions
-  // column) on every tab that shows it — spliced in rather than appended.
-  var COLS_JOBS = [BASE_COLS[0], COL_DATE_APPLIED].concat(BASE_COLS.slice(1), [COL_INTERVIEWING]);
-  var COLS_APPLIED = [BASE_COLS[0], COL_DATE_APPLIED].concat(BASE_COLS.slice(1), [COL_WHERE_APPLIED, COL_INTERVIEWING]);
-  // Reason and Dealbreakers come right after Applied on the Rejected tab.
-  var COLS_REJECTED = [BASE_COLS[0], COL_DATE_APPLIED, COL_REJECTION_REASON, COL_DEALBREAKERS].concat(
-    BASE_COLS.slice(1),
-    [COL_WHERE_APPLIED, COL_INTERVIEWING, COL_DATE_REJECTED]
-  );
-  var STAGE_COLS = { jobs: COLS_JOBS, applied: COLS_APPLIED, interviewing: COLS_APPLIED, rejected: COLS_REJECTED };
+  var COLS_JOBS = [COL_POSTED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
+  // column per interview logged — built per-render in interviewCols(), then spliced
+  // in between these two halves. See buildInterviewingCols().
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED];
+  var COLS_INTERVIEWING_TAIL = [COL_POSITION, COL_COMPANY, COL_RATING, COL_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_POSITION, COL_COMPANY, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
   var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
+
+  // One column per interview actually logged across the jobs shown on the
+  // Interviewing tab, plus always at least one (per spec, even with zero interviews
+  // logged anywhere yet). Recomputed on every render since it depends on live data.
+  function buildInterviewingCols() {
+    var maxCount = 1;
+    state.jobs.forEach(function (j) {
+      if (j.stage === "interviewing" && Array.isArray(j.interviews) && j.interviews.length > maxCount) {
+        maxCount = j.interviews.length;
+      }
+    });
+    var cols = [];
+    for (var i = 0; i < maxCount; i++) {
+      cols.push({ key: "interview_" + i, label: i === 0 ? "Interview" : "Interview " + (i + 1), type: "interview-date", w: "112px", sortable: false });
+    }
+    return cols;
+  }
+
+  function colsForStage(stage) {
+    if (stage === "jobs") return COLS_JOBS;
+    if (stage === "applied") return COLS_APPLIED;
+    if (stage === "interviewing") return COLS_INTERVIEWING_HEAD.concat(buildInterviewingCols(), COLS_INTERVIEWING_TAIL);
+    if (stage === "rejected") return COLS_REJECTED;
+    return [];
+  }
 
   // ---------- Tabs ----------
   var ACTIVE_TAB_KEY = "jobTrackerActiveTab.v1";
@@ -1883,6 +1903,16 @@
     return m ? m[2] + "/" + m[3] : "";
   }
 
+  // Sets interviews[idx].date, creating that entry (and padding any earlier missing
+  // ones with blanks so indices stay meaningful) if it doesn't exist yet — lets the
+  // Interviewing tab's "Interview"/"Interview N" columns double as a quick way to log
+  // a date without opening the drawer.
+  function setInterviewDate(job, idx, value) {
+    if (!Array.isArray(job.interviews)) job.interviews = [];
+    while (job.interviews.length <= idx) job.interviews.push({ id: uid(), date: "", notes: "" });
+    job.interviews[idx].date = value;
+  }
+
   // Browser spellcheck/autofill suggestions popping up over a spreadsheet-style grid of
   // same-shaped inputs is a known way to steal focus mid-keystroke — e.g. typing a "-"
   // or a word into a field the browser doesn't recognize as a real form field. Every
@@ -1924,6 +1954,20 @@
         return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + escapeHtml(o || "—") + "</option>";
       }).join("");
       return '<select class="' + (col.selectCls || "") + '" data-id="' + job.id + '" data-field="' + col.key + '">' + opts + "</select>";
+    }
+    if (col.type === "url") {
+      var urlEsc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      var urlOpen = v
+        ? '<a href="' + escapeHtml(normalizeUrl(v)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open" aria-label="Open link">↗</a>'
+        : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
+      return '<div class="linkedin-inner"><input type="text" value="' + urlEsc + '" placeholder="https://" data-id="' + job.id +
+        '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + ">" + urlOpen + "</div>";
+    }
+    if (col.type === "interview-date") {
+      var idx = parseInt(col.key.split("_")[1], 10);
+      var entry = Array.isArray(job.interviews) ? job.interviews[idx] : null;
+      var dateEsc = formatDateShort(entry ? entry.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<input type="text" value="' + dateEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
     }
     // Date columns render as plain text at rest (year hidden — see formatDateShort)
     // and swap to a real date input, picker included, the moment they're focused;
@@ -1977,7 +2021,7 @@
 
     if (stage === "contacts") { renderContactsTab(); return; }
 
-    var cols = STAGE_COLS[stage];
+    var cols = colsForStage(stage);
     var rows = state.jobs.filter(function (j) { return j.stage === stage; });
 
     var searching = !!state.search.trim();
@@ -2011,10 +2055,11 @@
     // Fixed, not resizable — it always needs to fit its buttons exactly (the longest
     // combination across stages is "← Applied" + "Rejected →" plus the two icon buttons).
     thead.innerHTML = '<th class="actions-col">Actions</th>' + cols.map(function (c) {
-      var active = sortCol && sortCol.key === c.key;
+      var sortable = c.sortable !== false;
+      var active = sortable && sortCol && sortCol.key === c.key;
       var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
-      return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key +
-        '" tabindex="0">' + c.label + '<span class="arrow">' + arrow + "</span>" +
+      return '<th class="' + (sortable ? "sortable" : "") + (active ? " active" : "") + '" data-key="' + c.key +
+        '" tabindex="0">' + c.label + (sortable ? '<span class="arrow">' + arrow + "</span>" : "") +
         '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
     }).join("");
 
@@ -2036,8 +2081,7 @@
 
     tbody.innerHTML = rows.map(function (job) {
       var cells = cols.map(function (c) {
-        var cls = [c.cls, c.num ? "cell-num" : ""].filter(Boolean).join(" ");
-        return '<td class="' + cls + '">' + cellHtml(job, c) + "</td>";
+        return '<td class="' + (c.cls || "") + '">' + cellHtml(job, c) + "</td>";
       }).join("");
 
       return '<tr data-id="' + job.id + '">' +
@@ -2199,7 +2243,7 @@
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
     if (field === "reviewCount") {
       e.target.value = formatWithCommas(e.target.value);
-    } else if (field && DATE_COL_KEYS.indexOf(field) !== -1) {
+    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field))) {
       // Back to a plain text cell showing just month/day — the full value (year
       // included) is still whatever was just picked, it's just not displayed here.
       e.target.type = "text";
@@ -2214,6 +2258,7 @@
   // enterable, just not shown once you click away.
   document.getElementById("tbody").addEventListener("focus", function (e) {
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
+    var interviewMatch = field && /^interview_(\d+)$/.exec(field);
     if (field === "reviewCount") {
       e.target.value = stripCommas(e.target.value);
     } else if (field && DATE_COL_KEYS.indexOf(field) !== -1) {
@@ -2221,6 +2266,13 @@
       var job = findJob(id);
       e.target.type = "date";
       e.target.value = (job && job[field]) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    } else if (interviewMatch) {
+      var id2 = e.target.getAttribute("data-id");
+      var job2 = findJob(id2);
+      var entry = job2 && Array.isArray(job2.interviews) ? job2.interviews[parseInt(interviewMatch[1], 10)] : null;
+      e.target.type = "date";
+      e.target.value = (entry && entry.date) || "";
       try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
     }
   }, true);
@@ -2320,10 +2372,23 @@
     if (!id || !field) return;
     var job = findJob(id);
     if (!job) return;
+    var interviewMatch = /^interview_(\d+)$/.exec(field);
+    if (interviewMatch) {
+      setInterviewDate(job, parseInt(interviewMatch[1], 10), el.value);
+      save(job);
+      return;
+    }
     if (el.type === "checkbox") job[field] = el.checked;
     else if (field === "reviewCount") { el.value = stripCommas(el.value); job[field] = el.value; }
     else job[field] = el.value;
     if (field === "reviewPercent") el.classList.toggle("low-rating", isLowRating(el.value));
+    if (field === "postingUrl") {
+      var openLink = el.closest("td").querySelector("a.icon-btn");
+      if (openLink) {
+        if (el.value) { openLink.style.opacity = ""; openLink.style.pointerEvents = ""; openLink.href = normalizeUrl(el.value); }
+        else { openLink.style.opacity = "0.35"; openLink.style.pointerEvents = "none"; }
+      }
+    }
     save(job);
   });
 
@@ -2334,14 +2399,16 @@
     if (job && el.tagName === "SELECT") {
       job[field] = el.value;
       save(job);
-    } else if (job && el.type === "checkbox" && field === "interviewing") {
-      var moved = applyInterviewingToggle(job, el.checked);
-      save(job, true);
-      if (moved) { renderTable(); return; }
     } else if (job && field === "dateApplied") {
       var movedDate = applyDateAppliedAutoMove(job);
       save(job, true);
       if (movedDate) { renderTable(); return; }
+    } else if (job && /^interview_\d+$/.test(field)) {
+      // Re-render in case this just logged an interview past the current column
+      // count — buildInterviewingCols() needs to pick up the new max and add a column.
+      save(job, true);
+      renderTable();
+      return;
     }
     renderStats();
   });
