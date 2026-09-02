@@ -631,6 +631,13 @@
     justify-content: space-between;
   }
 
+  .section-subtitle {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: -4px 0 8px;
+  }
+
   .field-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -888,8 +895,13 @@
           <div class="url-input-row"><input type="text" id="d-postingUrl" placeholder="https://"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
         </div>
         <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
-        <div class="field span-2"><label for="d-values">General notes</label><textarea id="d-values" placeholder="Culture, values, or anything else worth remembering about this one"></textarea></div>
       </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">General notes</p>
+      <p class="section-subtitle">Culture, values, or anything else worth remembering about this one</p>
+      <textarea id="d-values" style="width:100%; min-height:100px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Culture, values, or anything else worth remembering"></textarea>
     </div>
 
     <div class="section">
