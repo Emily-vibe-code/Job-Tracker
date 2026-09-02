@@ -1670,12 +1670,16 @@
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Date rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
+  // Rejected-tab only, same as Reason — most jobs are never a Pass, so this stays out
+  // of every other tab's columns rather than being an empty column everywhere.
+  var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
   var COLS_JOBS = BASE_COLS.concat([COL_DATE_APPLIED, COL_INTERVIEWING]);
   var COLS_APPLIED = BASE_COLS.concat([COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING]);
-  // Reason sits right after Date (3rd column overall, after the pinned Actions column) —
-  // spliced in rather than appended, so it's not just tacked on the end.
-  var COLS_REJECTED = [BASE_COLS[0], COL_REJECTION_REASON].concat(
+  // Reason sits right after Date (3rd column overall, after the pinned Actions column),
+  // with Dealbreakers right after it — both spliced in rather than appended, so they're
+  // not just tacked on the end.
+  var COLS_REJECTED = [BASE_COLS[0], COL_REJECTION_REASON, COL_DEALBREAKERS].concat(
     BASE_COLS.slice(1),
     [COL_DATE_APPLIED, COL_WHERE_APPLIED, COL_INTERVIEWING, COL_DATE_REJECTED]
   );
