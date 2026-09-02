@@ -92,7 +92,10 @@
   .app {
     max-width: min(2200px, 96vw);
     margin: 0 auto;
-    padding: 28px 28px 80px;
+    padding: 28px 28px 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ---------- Header ---------- */
@@ -210,6 +213,10 @@
     border-radius: 0 8px 8px 8px;
     box-shadow: var(--shadow-sm);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .toolbar {
@@ -278,6 +285,9 @@
 
   .sheet-scroll {
     overflow-x: auto;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
     /* A persistent, visible scrollbar — macOS hides overflow scrollbars by default until
        actively scrolling, which made horizontal scroll here easy to miss entirely. */
     scrollbar-width: thin;
@@ -310,7 +320,10 @@
     color: var(--ink-muted);
     font-weight: 600;
     padding: 9px 10px;
-    border-bottom: 1px solid var(--border-strong);
+    /* Heavy border + drop shadow, same treatment as the pinned Actions column —
+       reads as a fixed panel sitting above the rows at any scroll position. */
+    border-bottom: 3px solid var(--ink-muted);
+    box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.35);
     border-right: 1px solid var(--border);
     white-space: nowrap;
     z-index: 1;
@@ -417,6 +430,27 @@
   .chk-cell input[type="checkbox"] {
     width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer;
   }
+
+  .stars-cell {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    height: 100%;
+    padding: 0 6px;
+  }
+  .star-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--ink-faint);
+    cursor: pointer;
+  }
+  .star-btn.filled { color: var(--warn); }
+  .star-btn:hover, .star-btn:focus-visible { color: var(--warn); }
+  .star-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 2px; }
 
   .pill {
     display: inline-flex;
@@ -890,6 +924,7 @@
         <div class="field"><label for="d-location">Location</label>
           <select id="d-location"><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option><option value="On-site">On-site</option></select>
         </div>
+        <div class="field"><label>Excitement</label><div class="stars-cell" id="d-excitement-stars"></div></div>
         <div class="field"><label for="d-reviewPercent">G Rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
         <div class="field"><label for="d-reviewCount">G Reviews</label><input type="text" inputmode="numeric" id="d-reviewCount"></div>
         <div class="field"><label for="d-indeedRating">I Ratings (out of 5)</label><input type="number" id="d-indeedRating" min="0" max="5" step="0.1"></div>
@@ -1462,7 +1497,7 @@
   function blankJob() {
     return {
       id: uid(), stage: "jobs", createdAt: Date.now(),
-      date: "", position: "", company: "",
+      date: "", position: "", company: "", excitement: "",
       reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
@@ -1655,6 +1690,25 @@
       '<button class="icon-btn danger" data-action="delete" data-id="' + id + '" title="Delete" aria-label="Delete">🗑</button>';
   }
 
+  // Shared by the table cell and the drawer's own Excitement field — dataAttrs is
+  // whatever identifies the target (data-id + data-field for a table row, just
+  // data-field for the drawer, which always acts on the open job). Clicking a
+  // filled star that's already the current value clears the rating back to none.
+  function starButtonsHtml(value, dataAttrs) {
+    var val = parseInt(value, 10) || 0;
+    var stars = "";
+    for (var i = 1; i <= 5; i++) {
+      var filled = i <= val;
+      stars += '<button type="button" class="star-btn' + (filled ? " filled" : "") + '" ' + dataAttrs +
+        ' data-star="' + i + '" aria-label="' + i + " star" + (i > 1 ? "s" : "") + '" title="' + i + " star" + (i > 1 ? "s" : "") + '">' +
+        (filled ? "★" : "☆") + "</button>";
+    }
+    return stars;
+  }
+  function starsCellHtml(value, dataAttrs) {
+    return '<div class="stars-cell">' + starButtonsHtml(value, dataAttrs) + "</div>";
+  }
+
   function contactActionsInnerHtml(cid) {
     return '<button class="icon-btn" data-action="view-contact" data-cid="' + cid + '" title="Open contact" aria-label="Open contact">⤢</button>' +
       '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + cid + '" title="Delete" aria-label="Delete">🗑</button>';
@@ -1666,6 +1720,7 @@
   // array below just lists exactly what that tab wants, in order.
   var COL_POSTED = { key: "date", label: "Posted", type: "date", w: "112px" };
   var COL_POSITION = { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" };
+  var COL_EXCITEMENT = { key: "excitement", label: "Excitement", type: "stars", w: "130px" };
   var COL_COMPANY = { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" };
   var COL_RATING = { key: "reviewPercent", label: "G Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
   var COL_REVIEWS = { key: "reviewCount", label: "G Reviews", type: "number", commaFormat: true, w: "100px" };
@@ -1683,13 +1738,13 @@
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
-  var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_COMPANY, COL_POSITION, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
   var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED];
-  var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
   var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
@@ -1957,6 +2012,9 @@
     var v = fmt(job[col.key]);
     if (col.type === "checkbox") {
       return '<div class="chk-cell"><input type="checkbox" data-id="' + job.id + '" data-field="' + col.key + '" ' + (job[col.key] ? "checked" : "") + '></div>';
+    }
+    if (col.type === "stars") {
+      return starsCellHtml(v, 'data-id="' + job.id + '" data-field="' + col.key + '"');
     }
     if (col.type === "select") {
       var opts = col.options.map(function (o) {
@@ -2440,6 +2498,23 @@
     }
   });
 
+  // Clicking a star sets Excitement to that count; clicking the already-selected
+  // star clears it back to none. Swaps just this cell's markup rather than a full
+  // renderTable() so repeated clicks across rows don't reset scroll/focus.
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var starBtn = e.target.closest(".star-btn[data-id]");
+    if (!starBtn) return;
+    var id = starBtn.getAttribute("data-id"), field = starBtn.getAttribute("data-field");
+    var job = findJob(id);
+    if (!job) return;
+    var clicked = parseInt(starBtn.getAttribute("data-star"), 10);
+    var current = parseInt(job[field], 10) || 0;
+    job[field] = clicked === current ? "" : String(clicked);
+    save(job, true);
+    var cell = starBtn.closest(".stars-cell");
+    if (cell) cell.outerHTML = starsCellHtml(job[field], 'data-id="' + id + '" data-field="' + field + '"');
+  });
+
   // Double-click anywhere in a row (except the Actions cell, which has its own buttons)
   // opens the full record, same as the ⤢ button.
   document.getElementById("tbody").addEventListener("dblclick", function (e) {
@@ -2487,6 +2562,7 @@
       var el = document.getElementById("d-" + f);
       if (el) el.classList.toggle("low-rating", isLowRating(job[f]));
     });
+    document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
     updateDealbreakersVisibility(job);
     urlFieldSyncs["d-companyUrl"]();
     urlFieldSyncs["d-postingUrl"]();
@@ -2737,6 +2813,18 @@
       deleteFromDb(id);
       closeDrawer();
     }
+  });
+
+  document.getElementById("drawer").addEventListener("click", function (e) {
+    var starBtn = e.target.closest(".star-btn");
+    if (!starBtn || !state.activeId) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var clicked = parseInt(starBtn.getAttribute("data-star"), 10);
+    var current = parseInt(job.excitement, 10) || 0;
+    job.excitement = clicked === current ? "" : String(clicked);
+    save(job, true);
+    document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
   });
 
   document.getElementById("drawer").addEventListener("input", function (e) {
