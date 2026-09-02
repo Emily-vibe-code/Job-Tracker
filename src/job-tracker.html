@@ -1797,13 +1797,19 @@
     resizeDrag = null;
   });
 
+  // A job created here isn't persisted yet — it only exists in memory until the
+  // viewer actually edits something (a field, or adds a contact). Closing the
+  // drawer untouched discards it instead of leaving an empty record behind; see
+  // pendingNewJob / closeDrawer().
+  var pendingNewJob = null;
+
   document.getElementById("add-btn").addEventListener("click", function () {
     var job = blankJob();
     job.stage = state.activeStage;
     if (state.activeStage === "interviewing") job.interviewing = true;
     if (state.activeStage === "rejected" && !job.dateRejected) job.dateRejected = todayStr();
     state.jobs.push(job);
-    save(job, true);
+    pendingNewJob = { id: job.id, snapshot: JSON.stringify(job) };
     renderTable();
     openDrawer(job.id);
   });
@@ -2358,6 +2364,19 @@
     drawer.setAttribute("aria-hidden", "true");
     scrim.classList.remove("open");
     flushPendingWrites();
+    if (pendingNewJob && pendingNewJob.id === state.activeId) {
+      var newJob = findJob(pendingNewJob.id);
+      if (newJob) {
+        var untouched = JSON.stringify(newJob) === pendingNewJob.snapshot && !contactsForJob(newJob.id).length;
+        if (untouched) {
+          state.jobs = state.jobs.filter(function (j) { return j.id !== newJob.id; });
+          localSave();
+        } else {
+          save(newJob, true);
+        }
+      }
+      pendingNewJob = null;
+    }
     state.activeId = null;
     renderTable();
   }
