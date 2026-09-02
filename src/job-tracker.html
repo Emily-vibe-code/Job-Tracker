@@ -897,10 +897,10 @@
         <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
         <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
         <div class="field span-2"><label for="d-companyUrl">Company URL</label>
-          <div class="url-input-row"><input type="text" id="d-companyUrl" placeholder="https://"><a class="icon-btn" id="d-companyUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
+          <div class="url-input-row"><a class="icon-btn" id="d-companyUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-companyUrl" placeholder="https://"></div>
         </div>
         <div class="field span-2"><label for="d-postingUrl">Job posting link</label>
-          <div class="url-input-row"><input type="text" id="d-postingUrl" placeholder="https://"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a></div>
+          <div class="url-input-row"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-postingUrl" placeholder="https://"></div>
         </div>
         <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
       </div>
@@ -979,7 +979,7 @@
         <div class="field"><label for="cd-phone">Phone number</label><input type="tel" id="cd-phone" placeholder="e.g. (555) 123-4567"></div>
         <div class="field"><label for="cd-email">Email address</label><input type="email" id="cd-email" placeholder="name@company.com"></div>
         <div class="field"><label for="cd-linkedin">LinkedIn</label>
-          <div class="url-input-row"><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."><a class="icon-btn" id="cd-linkedin-open" href="#" target="_blank" rel="noopener" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a></div>
+          <div class="url-input-row"><a class="icon-btn" id="cd-linkedin-open" href="#" target="_blank" rel="noopener" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."></div>
         </div>
         <div class="field"><label for="cd-dateOfContact">Date of contact</label><input type="date" id="cd-dateOfContact"></div>
         <div class="field span-2">
@@ -1960,8 +1960,8 @@
       var urlOpen = v
         ? '<a href="' + escapeHtml(normalizeUrl(v)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open" aria-label="Open link">↗</a>'
         : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
-      return '<div class="linkedin-inner"><input type="text" value="' + urlEsc + '" placeholder="https://" data-id="' + job.id +
-        '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + ">" + urlOpen + "</div>";
+      return '<div class="linkedin-inner">' + urlOpen + '<input type="text" value="' + urlEsc + '" placeholder="https://" data-id="' + job.id +
+        '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + "></div>";
     }
     if (col.type === "interview-date") {
       var idx = parseInt(col.key.split("_")[1], 10);
@@ -2213,7 +2213,7 @@
         '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="cell-text">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
-        '<td class="linkedin-cell"><div class="linkedin-inner"><input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + ">" + linkedinOpen + "</div></td>" +
+        '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
         "</tr>";
     }).join("");
   }
