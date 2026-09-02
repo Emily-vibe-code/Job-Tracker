@@ -511,20 +511,6 @@
   .icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-  .move-btn {
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--ink-muted);
-    border-radius: 6px;
-    padding: 5px 9px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .move-btn:hover { background: var(--accent-soft); color: var(--accent-soft-ink); border-color: var(--accent); }
-  .move-btn.back:hover { background: var(--surface-alt); color: var(--ink); border-color: var(--border-strong); }
-
   .add-row {
     display: flex;
     align-items: center;
@@ -1608,19 +1594,13 @@
     return padded;
   }
 
-  function moveBtnsForStage(stage, id) {
-    if (stage === "jobs") return '<button class="move-btn" data-action="to-applied" data-id="' + id + '">Applied →</button>';
-    if (stage === "applied") return '<button class="move-btn back" data-action="to-jobs" data-id="' + id + '">← Jobs</button>' +
-      '<button class="move-btn" data-action="to-rejected" data-id="' + id + '">Rejected →</button>';
-    if (stage === "interviewing") return '<button class="move-btn back" data-action="to-applied" data-id="' + id + '">← Applied</button>' +
-      '<button class="move-btn" data-action="to-rejected" data-id="' + id + '">Rejected →</button>';
-    if (stage === "rejected") return '<button class="move-btn back" data-action="to-applied" data-id="' + id + '">← Applied</button>';
-    return "";
-  }
-
+  // Moving a job between stages is now entirely field-driven (Date applied, Date
+  // rejected, the Interviewing checkbox — see applyDateAppliedAutoMove /
+  // applyDateRejectedAutoMove / applyInterviewingToggle) rather than via explicit
+  // move buttons here, since a job can move to any of 3 other stages and that was
+  // too many actions to fit per row.
   function jobActionsInnerHtml(stage, id) {
     return '<button class="icon-btn" data-action="view" data-id="' + id + '" title="Open record" aria-label="Open record">⤢</button>' +
-      moveBtnsForStage(stage, id) +
       '<button class="icon-btn danger" data-action="delete" data-id="' + id + '" title="Delete" aria-label="Delete">🗑</button>';
   }
 
@@ -2186,21 +2166,32 @@
     return moved;
   }
 
-  // Filling in "Date applied" while still in Jobs moves the record to Applied.
+  // Filling in "Date applied" while still in Jobs moves the record to Applied;
+  // clearing it while in Applied moves it back — this is now the only way to move
+  // a record between Jobs and Applied, since the Actions column dropped its move
+  // buttons in favor of these field-driven moves.
   function applyDateAppliedAutoMove(job) {
     if (job.dateApplied && job.stage === "jobs") {
       job.stage = "applied";
       return true;
     }
+    if (!job.dateApplied && job.stage === "applied") {
+      job.stage = "jobs";
+      return true;
+    }
     return false;
   }
 
-  // Filling in "Date rejected" from any tab moves the record to Rejected — the same
-  // symmetry Date Applied already has, so a job entered with both dates set doesn't
-  // end up stranded in Applied with no visible move to Rejected.
+  // Filling in "Date rejected" from any tab moves the record to Rejected; clearing
+  // it while in Rejected moves it back to Applied. Same field-driven-move pattern
+  // as Date Applied above.
   function applyDateRejectedAutoMove(job) {
     if (job.dateRejected && job.stage !== "rejected") {
       job.stage = "rejected";
+      return true;
+    }
+    if (!job.dateRejected && job.stage === "rejected") {
+      job.stage = "applied";
       return true;
     }
     return false;
@@ -2254,21 +2245,7 @@
         deleteFromDb(id);
         renderTable();
       }
-      return;
     }
-    if (action === "to-applied") {
-      job.stage = "applied";
-      job.interviewing = false;
-      if (!job.dateApplied) job.dateApplied = todayStr();
-    } else if (action === "to-rejected") {
-      job.stage = "rejected";
-      if (!job.dateRejected) job.dateRejected = todayStr();
-    } else if (action === "to-jobs") {
-      job.stage = "jobs";
-      job.interviewing = false;
-    }
-    save(job, true);
-    renderTable();
   });
 
   // Double-click anywhere in a row (except the Actions cell, which has its own buttons)
