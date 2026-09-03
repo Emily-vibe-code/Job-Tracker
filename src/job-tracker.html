@@ -971,7 +971,6 @@
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
-        <div class="field"><label for="d-followUpDate">Follow-up date</label><input type="date" id="d-followUpDate"></div>
       </div>
     </div>
 
@@ -1514,7 +1513,7 @@
       date: "", position: "", company: "", excitement: "",
       reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
-      dateApplied: "", whereApplied: "", interviewing: false, followUpDate: "",
+      dateApplied: "", whereApplied: "", interviewing: false,
       dateRejected: "", rejectionReason: "", dealbreakers: "",
       companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
@@ -1747,22 +1746,27 @@
   var COL_MEDICAL = { key: "medical", label: "Medical", type: "text", w: "140px" };
   var COL_POSTING_URL = { key: "postingUrl", label: "Job posting link", type: "url", cls: "linkedin-cell", w: "170px" };
   var COL_DATE_APPLIED = { key: "dateApplied", label: "Applied", type: "date", w: "116px" };
-  var COL_FOLLOWUP_DATE = { key: "followUpDate", label: "Follow-up date", type: "date", w: "130px" };
+  // Not a real job field — reflects (and edits) whichever entry in job.followups[]
+  // is most recent, so the table shows one column that always tracks "the last
+  // time I followed up" rather than growing a column per follow-up the way the
+  // Interviewing tab's Interview columns do. See cellHtml's "followup-date" branch
+  // and setLastFollowupDate().
+  var COL_FOLLOWUP = { key: "followup_last", label: "Follow-up", type: "followup-date", w: "112px", sortable: false };
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
   var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP_DATE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
-  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP_DATE];
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP];
   var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
-  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected", "followUpDate"];
+  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
   // Comma-grouped counts (G Reviews, I Reviews) and out-of-5 ratings (G Rating,
   // I Ratings) share their formatting/highlight behavior across both the table and
   // the drawer — these lists are the single source of truth for which fields get it.
@@ -2001,6 +2005,18 @@
     job.interviews[idx].date = value;
   }
 
+  function lastFollowup(job) {
+    var entries = Array.isArray(job.followups) ? job.followups : [];
+    return entries.length ? entries[entries.length - 1] : null;
+  }
+  // Edits the most recent follow-up's date if one exists; otherwise creates the
+  // first entry (same "click to fill it in" behavior as the Interview column).
+  function setLastFollowupDate(job, value) {
+    if (!Array.isArray(job.followups)) job.followups = [];
+    if (job.followups.length === 0) job.followups.push({ id: uid(), date: value, notes: "" });
+    else job.followups[job.followups.length - 1].date = value;
+  }
+
   // Browser spellcheck/autofill suggestions popping up over a spreadsheet-style grid of
   // same-shaped inputs is a known way to steal focus mid-keystroke — e.g. typing a "-"
   // or a word into a field the browser doesn't recognize as a real form field. Every
@@ -2085,6 +2101,11 @@
       var entry = Array.isArray(job.interviews) ? job.interviews[idx] : null;
       var dateEsc = formatDateShort(entry ? entry.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
       return '<input type="text" value="' + dateEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
+    }
+    if (col.type === "followup-date") {
+      var fu = lastFollowup(job);
+      var fuEsc = formatDateShort(fu ? fu.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<input type="text" value="' + fuEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
     }
     // Date columns render as plain text at rest (year hidden — see formatDateShort)
     // and swap to a real date input, picker included, the moment they're focused;
@@ -2360,7 +2381,7 @@
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
     if (field && COMMA_FIELDS.indexOf(field) !== -1) {
       e.target.value = formatWithCommas(e.target.value);
-    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field))) {
+    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field) || field === "followup_last")) {
       // Back to a plain text cell showing just month/day — the full value (year
       // included) is still whatever was just picked, it's just not displayed here.
       e.target.type = "text";
@@ -2390,6 +2411,13 @@
       var entry = job2 && Array.isArray(job2.interviews) ? job2.interviews[parseInt(interviewMatch[1], 10)] : null;
       e.target.type = "date";
       e.target.value = (entry && entry.date) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    } else if (field === "followup_last") {
+      var id3 = e.target.getAttribute("data-id");
+      var job3 = findJob(id3);
+      var fu = job3 ? lastFollowup(job3) : null;
+      e.target.type = "date";
+      e.target.value = (fu && fu.date) || "";
       try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
     }
   }, true);
@@ -2496,6 +2524,11 @@
       save(job);
       return;
     }
+    if (field === "followup_last") {
+      setLastFollowupDate(job, el.value);
+      save(job);
+      return;
+    }
     if (el.type === "checkbox") job[field] = el.checked;
     else if (COMMA_FIELDS.indexOf(field) !== -1) { el.value = stripCommas(el.value); job[field] = el.value; }
     else job[field] = el.value;
@@ -2581,7 +2614,7 @@
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied",
-    "followUpDate", "dateRejected", "rejectionReason", "dealbreakers"];
+    "dateRejected", "rejectionReason", "dealbreakers"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
