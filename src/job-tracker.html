@@ -22,6 +22,7 @@
     --danger: #a3453f;
     --danger-soft: #f6dfdd;
     --success: #2f7a52;
+    --rating-high: #1a9d4b;
     --focus: #2b6e63;
     --shadow: 0 12px 32px -12px rgba(27, 36, 48, 0.28);
     --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.08);
@@ -49,6 +50,7 @@
       --danger: #e18c85;
       --danger-soft: #3c2422;
       --success: #6fbb8e;
+      --rating-high: #3ddc73;
       --focus: #5aab9b;
       --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -74,6 +76,7 @@
     --danger: #e18c85;
     --danger-soft: #3c2422;
     --success: #6fbb8e;
+    --rating-high: #3ddc73;
     --focus: #5aab9b;
     --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -434,6 +437,11 @@
   input.low-rating, .field input.low-rating {
     color: var(--danger);
     font-weight: 600;
+  }
+
+  input.high-rating, .field input.high-rating {
+    color: var(--rating-high);
+    font-weight: 700;
   }
 
   .chk-cell { text-align: center; }
@@ -1771,6 +1779,8 @@
   // I Ratings) share their formatting/highlight behavior across both the table and
   // the drawer — these lists are the single source of truth for which fields get it.
   var COMMA_FIELDS = ["reviewCount", "indeedReviewCount"];
+  // Despite the name, this list also drives the "high-rating" highlight (>4,
+  // bold + bright green) — same fields get both treatments, just at opposite ends.
   var LOW_RATING_FIELDS = ["reviewPercent", "indeedRating"];
 
   // One column per interview actually logged across the jobs shown on the
@@ -2117,7 +2127,9 @@
     if (col.min !== undefined) extra += ' min="' + col.min + '"';
     if (col.max !== undefined) extra += ' max="' + col.max + '"';
     if (col.step !== undefined) extra += ' step="' + col.step + '"';
-    var cls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? ' class="low-rating"' : "";
+    var ratingCls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? " low-rating" :
+      (LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isHighRating(v) ? " high-rating" : "");
+    var cls = ratingCls ? ' class="' + ratingCls.trim() + '"' : "";
     return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
       '"' + cls + extra + NO_ASSIST_ATTRS + '>';
   }
@@ -2125,6 +2137,11 @@
   function isLowRating(v) {
     var n = parseFloat(v);
     return v !== "" && !isNaN(n) && n < 3;
+  }
+
+  function isHighRating(v) {
+    var n = parseFloat(v);
+    return v !== "" && !isNaN(n) && n > 4;
   }
 
   function compareJobs(a, b, col, dir) {
@@ -2532,7 +2549,10 @@
     if (el.type === "checkbox") job[field] = el.checked;
     else if (COMMA_FIELDS.indexOf(field) !== -1) { el.value = stripCommas(el.value); job[field] = el.value; }
     else job[field] = el.value;
-    if (LOW_RATING_FIELDS.indexOf(field) !== -1) el.classList.toggle("low-rating", isLowRating(el.value));
+    if (LOW_RATING_FIELDS.indexOf(field) !== -1) {
+      el.classList.toggle("low-rating", isLowRating(el.value));
+      el.classList.toggle("high-rating", isHighRating(el.value));
+    }
     if (field === "postingUrl") {
       var openLink = el.closest("td").querySelector("a.icon-btn");
       if (openLink) {
@@ -2645,7 +2665,10 @@
     document.getElementById("d-interviewing").checked = !!job.interviewing;
     LOW_RATING_FIELDS.forEach(function (f) {
       var el = document.getElementById("d-" + f);
-      if (el) el.classList.toggle("low-rating", isLowRating(job[f]));
+      if (el) {
+        el.classList.toggle("low-rating", isLowRating(job[f]));
+        el.classList.toggle("high-rating", isHighRating(job[f]));
+      }
     });
     document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
     updateDealbreakersVisibility(job);
@@ -2934,7 +2957,10 @@
     if (m && SIMPLE_FIELDS.indexOf(m[1]) !== -1) {
       if (COMMA_FIELDS.indexOf(m[1]) !== -1) el.value = stripCommas(el.value);
       job[m[1]] = el.value;
-      if (LOW_RATING_FIELDS.indexOf(m[1]) !== -1) el.classList.toggle("low-rating", isLowRating(el.value));
+      if (LOW_RATING_FIELDS.indexOf(m[1]) !== -1) {
+        el.classList.toggle("low-rating", isLowRating(el.value));
+        el.classList.toggle("high-rating", isHighRating(el.value));
+      }
       save(job);
     }
   });
