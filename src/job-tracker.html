@@ -971,6 +971,7 @@
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
+        <div class="field"><label for="d-followUpDate">Follow-up date</label><input type="date" id="d-followUpDate"></div>
       </div>
     </div>
 
@@ -1513,7 +1514,7 @@
       date: "", position: "", company: "", excitement: "",
       reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
-      dateApplied: "", whereApplied: "", interviewing: false,
+      dateApplied: "", whereApplied: "", interviewing: false, followUpDate: "",
       dateRejected: "", rejectionReason: "", dealbreakers: "",
       companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
@@ -1746,21 +1747,22 @@
   var COL_MEDICAL = { key: "medical", label: "Medical", type: "text", w: "140px" };
   var COL_POSTING_URL = { key: "postingUrl", label: "Job posting link", type: "url", cls: "linkedin-cell", w: "170px" };
   var COL_DATE_APPLIED = { key: "dateApplied", label: "Applied", type: "date", w: "116px" };
+  var COL_FOLLOWUP_DATE = { key: "followUpDate", label: "Follow-up date", type: "date", w: "130px" };
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
   var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP_DATE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
-  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED];
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP_DATE];
   var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
-  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
+  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected", "followUpDate"];
   // Comma-grouped counts (G Reviews, I Reviews) and out-of-5 ratings (G Rating,
   // I Ratings) share their formatting/highlight behavior across both the table and
   // the drawer — these lists are the single source of truth for which fields get it.
@@ -2579,7 +2581,7 @@
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied",
-    "dateRejected", "rejectionReason", "dealbreakers"];
+    "followUpDate", "dateRejected", "rejectionReason", "dealbreakers"];
 
   function updateStageBadge(job) {
     var badge = document.getElementById("d-stage-badge");
