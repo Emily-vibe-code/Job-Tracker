@@ -950,6 +950,9 @@
           <div class="url-input-row"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-postingUrl" placeholder="https://"></div>
         </div>
         <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
+        <div class="field span-2"><label for="d-linkedinPosting">LinkedIn posting</label>
+          <div class="url-input-row"><a class="icon-btn" id="d-linkedinPosting-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-linkedinPosting" placeholder="https://"></div>
+        </div>
       </div>
     </div>
 
@@ -1512,7 +1515,7 @@
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false,
       dateRejected: "", rejectionReason: "", dealbreakers: "",
-      companyUrl: "", postingUrl: "", description: "", values: "", notes: "",
+      companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
     };
   }
@@ -2575,7 +2578,7 @@
   var scrim = document.getElementById("scrim");
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
-    "pto", "medical", "companyUrl", "postingUrl", "description", "values", "dateApplied", "whereApplied",
+    "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied",
     "dateRejected", "rejectionReason", "dealbreakers"];
 
   function updateStageBadge(job) {
@@ -2613,6 +2616,7 @@
     updateDealbreakersVisibility(job);
     urlFieldSyncs["d-companyUrl"]();
     urlFieldSyncs["d-postingUrl"]();
+    urlFieldSyncs["d-linkedinPosting"]();
 
     updateStageBadge(job);
 
@@ -3094,6 +3098,7 @@
 
   wireUrlField("d-companyUrl", "d-companyUrl-open");
   wireUrlField("d-postingUrl", "d-postingUrl-open");
+  wireUrlField("d-linkedinPosting", "d-linkedinPosting-open");
   wireUrlField("cd-linkedin", "cd-linkedin-open");
 
   // Pressing Enter in any field commits it (blurs, so the value saves and the field is
