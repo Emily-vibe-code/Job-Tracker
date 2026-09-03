@@ -2584,12 +2584,13 @@
     badge.className = "stage-badge stage-" + job.stage;
   }
 
-  // "Dealbreakers" only makes sense when the rejection was a Pass (you turned it
-  // down), so it stays hidden the rest of the time instead of cluttering every
-  // rejected record.
+  // "Dealbreakers" only makes sense when you were the one who turned it down —
+  // a Pass (never applied further) or a Withdrawn (pulled out after applying) —
+  // so it stays hidden the rest of the time instead of cluttering every rejected
+  // record.
   function updateDealbreakersVisibility(job) {
     var wrap = document.getElementById("dealbreakers-field");
-    if (wrap) wrap.style.display = job.rejectionReason === "Pass" ? "" : "none";
+    if (wrap) wrap.style.display = (job.rejectionReason === "Pass" || job.rejectionReason === "Withdrawn") ? "" : "none";
   }
 
   function openDrawer(id) {
