@@ -1260,6 +1260,33 @@
     });
   }
 
+  // Applying a fetched/pushed snapshot by wholesale-replacing state.jobs is unsafe: a
+  // read (get() or even a live onSnapshot delivery) isn't guaranteed to already reflect
+  // a write this same session just made — it can lag by a moment. Replacing outright
+  // then makes a job that's genuinely saved fine flicker out of view (or, worse, get
+  // written back out with localSave() and stay gone until something else corrects it).
+  // Merging instead — add/update anything the snapshot has, but never drop a local job
+  // just because this particular snapshot doesn't (yet) include it — makes sync eventually
+  // consistent without ever being destructively wrong. Real deletions only ever happen
+  // through the app's own explicit delete action, which already removes the local copy
+  // directly; they were never inferred from a job's absence in a snapshot.
+  function mergeJobsFromSnapshot(remoteJobs) {
+    var byId = {};
+    state.jobs.forEach(function (j) { byId[j.id] = j; });
+    remoteJobs.forEach(function (rj) { byId[rj.id] = rj; });
+    var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+    merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    state.jobs = merged;
+  }
+  function mergeContactsFromSnapshot(remoteContacts) {
+    var byId = {};
+    state.contacts.forEach(function (c) { byId[c.id] = c; });
+    remoteContacts.forEach(function (rc) { byId[rc.id] = rc; });
+    var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+    merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    state.contacts = merged;
+  }
+
   async function initCloudSync() {
     if (!window.claude || typeof window.claude.use !== "function") {
       setSyncStatus("off", "Saved on this device only");
@@ -1284,7 +1311,7 @@
       // same race the live listener below already guards against. Also true while a
       // contact's own drawer is open, since that edits a job object too.
       if (!snap.empty && !isSyncSensitive()) {
-        state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
+        mergeJobsFromSnapshot(snap.docs.map(function (d) { return normalizeJob(d.data()); }));
         localSave();
         renderTable();
       } else if (snap.empty && state.jobs.length) {
@@ -1295,7 +1322,7 @@
     try {
       var cSnap = await contactsCol.orderBy("createdAt").get();
       if (!cSnap.empty && !isSyncSensitive()) {
-        state.contacts = cSnap.docs.map(function (d) { return normalizeContact(d.data()); });
+        mergeContactsFromSnapshot(cSnap.docs.map(function (d) { return normalizeContact(d.data()); }));
         localSaveContacts();
         renderTable();
       } else if (cSnap.empty && state.contacts.length) {
@@ -1307,8 +1334,7 @@
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
       if (isSyncSensitive()) return; // don't clobber an in-progress (or not-yet-confirmed) edit
-      var jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
-      state.jobs = jobs;
+      mergeJobsFromSnapshot(snap.docs.map(function (d) { return normalizeJob(d.data()); }));
       localSave();
       migrateEmbeddedContacts();
       migrateValuesNotes();
@@ -1319,7 +1345,7 @@
 
     contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
       if (isSyncSensitive()) return;
-      state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
+      mergeContactsFromSnapshot(snap.docs.map(function (d) { return normalizeContact(d.data()); }));
       localSaveContacts();
       renderTable();
     }, function () {
