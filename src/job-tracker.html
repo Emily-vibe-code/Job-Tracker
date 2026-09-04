@@ -3165,37 +3165,21 @@
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
   });
 
-  // Two things can leave the sheet showing stale data until a manual reload after the
-  // tab sits backgrounded for a while: (1) a cell was left mid-edit with nothing ever
-  // blurring it, so isEditingInline() blocks every sync update indefinitely, and (2) the
-  // realtime listener itself can silently die during a long background/sleep period
-  // without the SDK ever telling us. Leaving the tab cleans up the first; coming back
-  // does one defensive re-fetch to recover from the second, skipped entirely if there's
-  // anything local right now that a stale server read shouldn't be allowed to clobber.
+  // A cell left mid-edit with nothing ever blurring it (e.g. the viewer switched tabs
+  // instead of clicking away) would otherwise leave isEditingInline() blocking every
+  // sync update indefinitely, even after the tab comes back. Blur it on the way out.
+  //
+  // NOTE: this used to also do a one-shot re-fetch on returning to the tab, as a defense
+  // against the realtime listener silently dying while backgrounded. Removed — a get()
+  // read can lag behind very recent writes from this same session, and wholesale-replacing
+  // state.jobs from that lagging snapshot was deleting jobs added just before switching
+  // away (they were still safe on the server; a refresh's own fresh fetch just happened to
+  // land after the lag caught up, so they'd reappear). The stale in-flight-write timeout
+  // below is a safe fix for the original stuck-forever symptom; this one wasn't.
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) {
-      var active = document.activeElement;
-      if (active && active.closest && active.closest("#tbody")) active.blur();
-      return;
-    }
-    if (isSyncSensitive()) return;
-    if (jobsCol) {
-      jobsCol.orderBy("createdAt").get().then(function (snap) {
-        if (isSyncSensitive() || snap.empty) return;
-        state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
-        localSave();
-        migrateEmbeddedContacts();
-        renderTable();
-      }).catch(function () { /* live listener will catch up on its own if this fails */ });
-    }
-    if (contactsCol) {
-      contactsCol.orderBy("createdAt").get().then(function (snap) {
-        if (isSyncSensitive() || snap.empty) return;
-        state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
-        localSaveContacts();
-        renderTable();
-      }).catch(function () { /* live listener will catch up on its own if this fails */ });
-    }
+    if (!document.hidden) return;
+    var active = document.activeElement;
+    if (active && active.closest && active.closest("#tbody")) active.blur();
   });
 
   wireUrlField("d-companyUrl", "d-companyUrl-open");
