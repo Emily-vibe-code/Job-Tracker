@@ -1173,7 +1173,13 @@
   var jobsCol = null;
   var writeTimers = {};
   var pendingWrites = {};   // id -> the write fn, so a debounced write can be flushed early
-  var inFlightWrites = {};  // id -> true while its .set() call is outstanding
+  var inFlightWrites = {};  // id -> Date.now() when its .set() call started (see STALE_WRITE_MS)
+  // If a write's promise never settles — e.g. the network request got dropped while
+  // the tab was backgrounded/asleep and the underlying SDK never rejects — inFlightWrites
+  // would otherwise stay populated forever, which through isSyncSensitive() blocks every
+  // future cloud update from ever being applied until the page is reloaded. Treating an
+  // in-flight write as stale after this long lets sync recover on its own instead.
+  var STALE_WRITE_MS = 20000;
   var syncStatusEl = document.getElementById("sync-status");
   var syncStatusText = document.getElementById("sync-status-text");
 
@@ -1216,7 +1222,7 @@
     var doWrite = function () {
       delete writeTimers[id];
       delete pendingWrites[id];
-      inFlightWrites[id] = true;
+      inFlightWrites[id] = Date.now();
       jobsCol.doc(id).set(body)
         .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
         .finally(function () { delete inFlightWrites[id]; });
@@ -1242,7 +1248,8 @@
   // defined below) the same for a contact — a cloud sync delivery arriving in that window
   // could be stale relative to it, so callers must not let it overwrite local state.
   function hasPendingJobWrites() {
-    return Object.keys(writeTimers).length > 0 || Object.keys(inFlightWrites).length > 0;
+    if (Object.keys(writeTimers).length > 0) return true;
+    return Object.keys(inFlightWrites).some(function (id) { return Date.now() - inFlightWrites[id] < STALE_WRITE_MS; });
   }
 
   function deleteFromDb(id) {
@@ -1585,7 +1592,7 @@
     var doWrite = function () {
       delete contactWriteTimers[id];
       delete pendingContactWrites[id];
-      inFlightContactWrites[id] = true;
+      inFlightContactWrites[id] = Date.now();
       contactsCol.doc(id).set(body)
         .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
         .finally(function () { delete inFlightContactWrites[id]; });
@@ -1605,7 +1612,8 @@
   }
 
   function hasPendingContactWrites() {
-    return Object.keys(contactWriteTimers).length > 0 || Object.keys(inFlightContactWrites).length > 0;
+    if (Object.keys(contactWriteTimers).length > 0) return true;
+    return Object.keys(inFlightContactWrites).some(function (id) { return Date.now() - inFlightContactWrites[id] < STALE_WRITE_MS; });
   }
 
   function deleteContactFromDb(id) {
@@ -3155,6 +3163,39 @@
     if (isSyncSensitive()) return;
     if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
+  });
+
+  // Two things can leave the sheet showing stale data until a manual reload after the
+  // tab sits backgrounded for a while: (1) a cell was left mid-edit with nothing ever
+  // blurring it, so isEditingInline() blocks every sync update indefinitely, and (2) the
+  // realtime listener itself can silently die during a long background/sleep period
+  // without the SDK ever telling us. Leaving the tab cleans up the first; coming back
+  // does one defensive re-fetch to recover from the second, skipped entirely if there's
+  // anything local right now that a stale server read shouldn't be allowed to clobber.
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      var active = document.activeElement;
+      if (active && active.closest && active.closest("#tbody")) active.blur();
+      return;
+    }
+    if (isSyncSensitive()) return;
+    if (jobsCol) {
+      jobsCol.orderBy("createdAt").get().then(function (snap) {
+        if (isSyncSensitive() || snap.empty) return;
+        state.jobs = snap.docs.map(function (d) { return normalizeJob(d.data()); });
+        localSave();
+        migrateEmbeddedContacts();
+        renderTable();
+      }).catch(function () { /* live listener will catch up on its own if this fails */ });
+    }
+    if (contactsCol) {
+      contactsCol.orderBy("createdAt").get().then(function (snap) {
+        if (isSyncSensitive() || snap.empty) return;
+        state.contacts = snap.docs.map(function (d) { return normalizeContact(d.data()); });
+        localSaveContacts();
+        renderTable();
+      }).catch(function () { /* live listener will catch up on its own if this fails */ });
+    }
   });
 
   wireUrlField("d-companyUrl", "d-companyUrl-open");
