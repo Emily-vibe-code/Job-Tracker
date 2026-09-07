@@ -2083,10 +2083,11 @@
     var applied = state.jobs.filter(function (j) { return j.stage === "applied"; }).length;
     var interviewing = state.jobs.filter(function (j) { return j.stage === "interviewing"; }).length;
     var rejected = state.jobs.filter(function (j) { return j.stage === "rejected"; }).length;
-    // The "Applied" stat counts every job that's ever been applied to, not just
-    // ones still sitting in the Applied tab — once you've interviewed or been
-    // rejected you clearly applied too, so those stages count toward it as well.
-    var appliedTotal = applied + interviewing + rejected;
+    // The "Applied" stat counts jobs that actually have a Date applied filled in —
+    // not just anything sitting in Applied/Interviewing/Rejected, since a job can
+    // reach Rejected (or be created there directly) without ever having been applied
+    // to, e.g. a cold rejection or a "Pass" you decided on before applying.
+    var appliedTotal = state.jobs.filter(function (j) { return !!j.dateApplied; }).length;
     var rejectedCount = state.jobs.filter(function (j) { return j.stage === "rejected" && REJECTED_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
     var passCount = state.jobs.filter(function (j) { return j.stage === "rejected" && PASS_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
     document.getElementById("stats").innerHTML = [
