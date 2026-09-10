@@ -919,6 +919,7 @@
     </div>
     <div class="add-row" id="contacts-add-row" style="display:none;">
       <button class="btn btn-primary" id="add-contact-standalone" type="button">+ Add contact</button>
+      <button class="btn" id="paste-btn-contacts" type="button">+ Paste from bookmarklet</button>
       <span class="bookmarklet-hint">Or add one from any job's detail view.</span>
     </div>
   </div>
@@ -1531,6 +1532,11 @@
     pasteModal.setAttribute("aria-hidden", "true");
   }
   document.getElementById("paste-btn").addEventListener("click", openPasteModal);
+  // Same trigger, duplicated on the Contacts tab's add-row — the tracker remembers
+  // whichever tab was last open (even from a prior session) and can land you there
+  // when the bookmarklet opens a fresh page, and Contacts' own add-row otherwise has
+  // no way to reach the paste flow at all.
+  document.getElementById("paste-btn-contacts").addEventListener("click", openPasteModal);
   document.getElementById("paste-cancel").addEventListener("click", closePasteModal);
   pasteScrim.addEventListener("click", closePasteModal);
   document.addEventListener("keydown", function (e) {
