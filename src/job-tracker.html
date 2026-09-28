@@ -1042,8 +1042,9 @@
         </div>
         <div class="field"><label for="cd-dateOfContact">Date of contact</label><input type="date" id="cd-dateOfContact"></div>
         <div class="field span-2">
-          <label>Company</label>
-          <button type="button" class="btn" id="cd-company-link" style="width:100%; justify-content:flex-start;"></button>
+          <label for="cd-company">Company</label>
+          <input type="text" id="cd-company" placeholder="Company name">
+          <button type="button" class="btn" id="cd-company-link" style="width:100%; justify-content:flex-start; display:none;"></button>
         </div>
       </div>
     </div>
@@ -2036,10 +2037,21 @@
     return m ? m[2] + "/" + m[3] : "";
   }
 
-  // Live-formats a phone number to ###-###-#### as it's typed, from whatever
-  // digits are present (pasted, typed, with or without punctuation).
+  // Live-formats a phone number as it's typed. A number starting with "+" is treated
+  // as international (e.g. UK: "+44 7700 900123") — the country code and the spacing
+  // are kept as typed rather than forced into the domestic grouping below, which would
+  // otherwise strip the "+44" and mis-group the remaining digits. Anything else is
+  // formatted ###-###-#### from whatever digits are present (pasted, typed, with or
+  // without punctuation), same as before.
   function formatPhoneNumber(v) {
-    var digits = String(v || "").replace(/\D/g, "").slice(0, 10);
+    var raw = String(v || "");
+    var leading = /^\s*/.exec(raw)[0];
+    var rest = raw.slice(leading.length);
+    if (rest.charAt(0) === "+") {
+      var body = rest.slice(1).replace(/[^\d\s]/g, "").replace(/ {2,}/g, " ").replace(/^\s+/, "");
+      return "+" + body;
+    }
+    var digits = rest.replace(/\D/g, "").slice(0, 10);
     if (digits.length <= 3) return digits;
     if (digits.length <= 6) return digits.slice(0, 3) + "-" + digits.slice(3);
     return digits.slice(0, 3) + "-" + digits.slice(3, 6) + "-" + digits.slice(6);
@@ -2392,12 +2404,14 @@
     tbody.innerHTML = entries.map(function (c) {
       var job = c.jobId ? findJob(c.jobId) : null;
       if (syncContactCompany(c)) saveContact(c, false);
+      var esc = function (v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); };
+      // Linked to a job: Company is a read-only jump link (syncContactCompany keeps it
+      // matching the job's own name). Not linked — including standalone contacts, and
+      // ones whose job got deleted — it's a plain editable field instead, so there's
+      // always a way to type a company name in, not just display one from elsewhere.
       var companyCell = job
         ? '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.company || job.position || "Untitled job") + "</button>"
-        : (c.company
-          ? '<span style="color:var(--ink-faint);" title="The linked job was deleted">' + escapeHtml(c.company) + "</span>"
-          : '<span style="color:var(--ink-faint);">—</span>');
-      var esc = function (v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); };
+        : '<input type="text" value="' + esc(c.company) + '" placeholder="Company name" data-cid="' + c.id + '" data-cfield="company"' + NO_ASSIST_ATTRS + '>';
       var linkedinOpen = c.linkedin
         ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
         : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
@@ -2407,7 +2421,7 @@
         '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"' + NO_ASSIST_ATTRS + "></td>" +
         '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"' + NO_ASSIST_ATTRS + "></td>" +
         '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"' + NO_ASSIST_ATTRS + "></td>" +
-        '<td class="cell-text">' + companyCell + "</td>" +
+        '<td class="' + (job ? "cell-text" : "") + '">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
         '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
         "</tr>";
@@ -2763,6 +2777,7 @@
   var cdScrim = document.getElementById("cd-scrim");
   var cdDrawer = document.getElementById("cd-drawer");
   var cdCompanyLink = document.getElementById("cd-company-link");
+  var cdCompanyInput = document.getElementById("cd-company");
   var CD_FIELDS = ["phone", "email", "linkedin", "dateOfContact"];
   var cdActiveId = null;
 
@@ -2783,18 +2798,19 @@
     urlFieldSyncs["cd-linkedin"]();
     var job = c.jobId ? findJob(c.jobId) : null;
     if (syncContactCompany(c)) saveContact(c, false);
+    // Linked to a job: Company is a read-only jump link. Not linked (including a
+    // standalone contact, or one whose linked job got deleted) — it's a plain
+    // editable field instead, so there's always a way to type a company name in.
     if (job) {
+      cdCompanyInput.style.display = "none";
+      cdCompanyLink.style.display = "";
       cdCompanyLink.textContent = (job.company || job.position || "Untitled job") + " — open job record ↗";
       cdCompanyLink.style.cursor = "pointer";
       cdCompanyLink.style.color = "var(--accent)";
-    } else if (c.company) {
-      cdCompanyLink.textContent = c.company + " (job deleted)";
-      cdCompanyLink.style.cursor = "default";
-      cdCompanyLink.style.color = "var(--ink-faint)";
     } else {
-      cdCompanyLink.textContent = "Not linked to a job";
-      cdCompanyLink.style.cursor = "default";
-      cdCompanyLink.style.color = "var(--ink-faint)";
+      cdCompanyLink.style.display = "none";
+      cdCompanyInput.style.display = "";
+      cdCompanyInput.value = c.company || "";
     }
     cdDrawer.classList.add("open");
     cdDrawer.setAttribute("aria-hidden", "false");
@@ -2835,6 +2851,7 @@
   document.getElementById("cd-name").addEventListener("input", function (e) { saveActiveContactField("name", e.target.value); });
   document.getElementById("cd-connection").addEventListener("input", function (e) { saveActiveContactField("connection", e.target.value); });
   document.getElementById("cd-notes").addEventListener("input", function (e) { saveActiveContactField("notes", e.target.value); });
+  cdCompanyInput.addEventListener("input", function (e) { saveActiveContactField("company", e.target.value); });
   CD_FIELDS.forEach(function (f) {
     document.getElementById("cd-" + f).addEventListener("input", function (e) {
       if (f === "phone") e.target.value = formatPhoneNumber(e.target.value);
