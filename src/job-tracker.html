@@ -2591,12 +2591,14 @@
     return moved;
   }
 
-  // Filling in "Date applied" while still in Jobs moves the record to Applied;
-  // clearing it while in Applied moves it back — this is now the only way to move
-  // a record between Jobs and Applied, since the Actions column dropped its move
-  // buttons in favor of these field-driven moves.
+  // Filling in "Date applied" moves the record to Applied from any stage except
+  // Interviewing (further along — entering a date there shouldn't demote it back);
+  // clearing it while in Applied moves it back to Jobs. Mirrors applyDateRejectedAutoMove
+  // below, which already worked "from any stage" — this one originally only moved out
+  // of Jobs specifically, which meant a job stuck in Rejected (e.g. from a past sync bug
+  // leaving stage="rejected" with no rejection date) had no way back out via this field.
   function applyDateAppliedAutoMove(job) {
-    if (job.dateApplied && job.stage === "jobs") {
+    if (job.dateApplied && job.stage !== "applied" && job.stage !== "interviewing") {
       job.stage = "applied";
       return true;
     }
@@ -2749,6 +2751,14 @@
     var job = findJob(id);
     if (!job) return;
     state.activeId = id;
+
+    // Self-heal on open: a record can have a stage that no longer matches its own
+    // dates — most commonly a leftover from the stale-sync bug where a job ended up
+    // stage="rejected" with no rejection date ever set. Re-running both auto-moves
+    // here corrects that the moment the record is viewed, without needing to clear
+    // and retype a date that's already correct, just not yet reflected in the stage.
+    var healed = applyDateAppliedAutoMove(job) || applyDateRejectedAutoMove(job);
+    if (healed) save(job, true);
 
     document.getElementById("d-position").value = job.position || "";
     document.getElementById("d-company").value = job.company || "";
