@@ -2597,8 +2597,17 @@
   // below, which already worked "from any stage" — this one originally only moved out
   // of Jobs specifically, which meant a job stuck in Rejected (e.g. from a past sync bug
   // leaving stage="rejected" with no rejection date) had no way back out via this field.
+  //
+  // One deliberate asymmetry: a job that's Rejected AND still has a Date rejected stays
+  // put even if Date applied gets filled in (or was already set, e.g. on open — the vast
+  // majority of rejections have both dates, applied-then-rejected). Date rejected still
+  // being set means the rejection itself hasn't been undone; only clearing THAT field
+  // (applyDateRejectedAutoMove's own move-back below) should pull it out of Rejected.
+  // Without this, simply opening any normal already-rejected record — or filling in Date
+  // applied without meaning to also un-reject it — would silently move it to Applied.
   function applyDateAppliedAutoMove(job) {
     if (job.dateApplied && job.stage !== "applied" && job.stage !== "interviewing") {
+      if (job.stage === "rejected" && job.dateRejected) return false;
       job.stage = "applied";
       return true;
     }
