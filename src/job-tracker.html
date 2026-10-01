@@ -889,7 +889,7 @@
   <div class="global-search">
     <div class="search-field">
       <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input type="text" id="search-input" placeholder="Search all jobs and contacts by company or name">
+      <input type="text" id="search-input" placeholder="Search all jobs and contacts by company, title, or name">
       <button type="button" id="search-clear" aria-label="Clear search">✕</button>
     </div>
   </div>
@@ -1216,6 +1216,10 @@
   }
 
   function save(job, immediate) {
+    // Bumped on every save, local-only or not — this is what lets mergeJobsFromSnapshot
+    // tell a just-edited local job apart from a stale/lagging snapshot of the same job
+    // that doesn't reflect the edit yet (see that function for why that distinction matters).
+    job.updatedAt = Date.now();
     localSave();
     if (!jobsCol || !job) return;
     var id = job.id;
@@ -1272,10 +1276,22 @@
   // consistent without ever being destructively wrong. Real deletions only ever happen
   // through the app's own explicit delete action, which already removes the local copy
   // directly; they were never inferred from a job's absence in a snapshot.
+  //
+  // That's enough for a job the snapshot doesn't have at all, but it's not enough for one
+  // it DOES have: if the snapshot's own copy of an existing job is itself stale (same lag,
+  // just not total absence — a background onSnapshot delivery queued before the viewer's
+  // last edit confirmed, then arriving after), blindly trusting the snapshot for any id it
+  // recognizes silently reverts that edit. updatedAt (bumped on every save(), local-only
+  // writes included) is what tells the two apart — the side that was actually touched more
+  // recently wins, whichever side that is.
+  function newerRecord(remote, local) {
+    if (!local) return remote;
+    return (remote.updatedAt || 0) >= (local.updatedAt || 0) ? remote : local;
+  }
   function mergeJobsFromSnapshot(remoteJobs) {
     var byId = {};
     state.jobs.forEach(function (j) { byId[j.id] = j; });
-    remoteJobs.forEach(function (rj) { byId[rj.id] = rj; });
+    remoteJobs.forEach(function (rj) { byId[rj.id] = newerRecord(rj, byId[rj.id]); });
     var merged = Object.keys(byId).map(function (id) { return byId[id]; });
     merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     state.jobs = merged;
@@ -1283,7 +1299,7 @@
   function mergeContactsFromSnapshot(remoteContacts) {
     var byId = {};
     state.contacts.forEach(function (c) { byId[c.id] = c; });
-    remoteContacts.forEach(function (rc) { byId[rc.id] = rc; });
+    remoteContacts.forEach(function (rc) { byId[rc.id] = newerRecord(rc, byId[rc.id]); });
     var merged = Object.keys(byId).map(function (id) { return byId[id]; });
     merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     state.contacts = merged;
@@ -1578,7 +1594,7 @@
 
   function blankJob() {
     return {
-      id: uid(), stage: "jobs", createdAt: Date.now(),
+      id: uid(), stage: "jobs", createdAt: Date.now(), updatedAt: Date.now(),
       date: "", position: "", company: "", excitement: "",
       reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
@@ -1601,7 +1617,7 @@
 
   function blankContact() {
     return {
-      id: uid(), jobId: null, createdAt: Date.now(),
+      id: uid(), jobId: null, createdAt: Date.now(), updatedAt: Date.now(),
       name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
       // Snapshot of the linked job's company name. Kept in sync with the live job
       // (see syncContactCompany) while it exists, so the name survives if that job is
@@ -1638,6 +1654,7 @@
   }
 
   function saveContact(contact, immediate) {
+    contact.updatedAt = Date.now();
     localSaveContacts();
     if (!contactsCol || !contact) return;
     var id = contact.id;
@@ -1898,7 +1915,8 @@
 
   // ---------- Search (global — searches every tab, not just the active one) ----------
   function jobMatchesQuery(job, q) {
-    return (job.company || "").toLowerCase().indexOf(q) !== -1;
+    return (job.company || "").toLowerCase().indexOf(q) !== -1 ||
+      (job.position || "").toLowerCase().indexOf(q) !== -1;
   }
   function contactMatchesQuery(contact, q) {
     var job = contact.jobId ? findJob(contact.jobId) : null;
@@ -2297,7 +2315,7 @@
 
     var tbody = document.getElementById("tbody");
     if (rows.length === 0) {
-      var heading = searching ? "No companies match “" + escapeHtml(state.search.trim()) + "”" : "No records in " + STAGE_LABEL[stage] + " yet";
+      var heading = searching ? "Nothing matches “" + escapeHtml(state.search.trim()) + "”" : "No records in " + STAGE_LABEL[stage] + " yet";
       var body = searching ? "Try a different spelling, or clear the search to see everything in " + STAGE_LABEL[stage] + "." :
         (stage === "jobs" ? "Add a role you're considering to start tracking it." : "Move a record here from another tab, or add one directly.");
       tbody.innerHTML = '<tr><td colspan="' + (cols.length + 1) + '"><div class="empty">' +
