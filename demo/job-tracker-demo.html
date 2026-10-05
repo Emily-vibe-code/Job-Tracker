@@ -3046,6 +3046,36 @@
     if (job && (e.target.id === "d-position" || e.target.id === "d-company")) save(job, true);
     if (COMMA_FIELDS.indexOf(e.target.id.replace(/^d-/, "")) !== -1) e.target.value = formatWithCommas(e.target.value);
   }, true);
+  // Job description spacing cleanup. Pasted postings tend to arrive with runs of blank
+  // lines and trailing spaces. On paste and on blur (never per keystroke — rewriting
+  // el.value mid-typing would make the cursor jump) this strips trailing spaces from each
+  // line, collapses 3+ line breaks to exactly one blank line, and trims blank lines from
+  // both ends. Trailing whitespace goes first so whitespace-only lines count as blank.
+  function cleanDescriptionText(text, keepTrailing) {
+    var t = String(text || "").replace(/\r\n?/g, "\n").replace(/[ \t ]+$/gm, "").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+    return keepTrailing ? t : t.replace(/\n+$/, "");
+  }
+  function tidyDescriptionField() {
+    var el = document.getElementById("d-description");
+    var job = state.activeId && findJob(state.activeId);
+    if (!job) return;
+    var cleaned = cleanDescriptionText(el.value);
+    if (cleaned !== el.value) {
+      // Keep the caret where it was relative to the text before it (matters after a
+      // mid-text paste); a blur doesn't care where the caret is.
+      var caret = el.selectionStart;
+      var caretCleaned = cleanDescriptionText(el.value.slice(0, caret), true).length;
+      el.value = cleaned;
+      if (document.activeElement === el) el.setSelectionRange(Math.min(caretCleaned, cleaned.length), Math.min(caretCleaned, cleaned.length));
+    }
+    if (job.description !== cleaned) {
+      job.description = cleaned;
+      save(job);
+    }
+  }
+  document.getElementById("d-description").addEventListener("paste", function () { setTimeout(tidyDescriptionField, 0); });
+  document.getElementById("d-description").addEventListener("blur", tidyDescriptionField);
+
   document.getElementById("drawer").addEventListener("change", function (e) {
     var job = state.activeId && findJob(state.activeId);
     if (!job) return;
