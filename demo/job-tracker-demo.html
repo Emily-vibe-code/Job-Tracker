@@ -821,8 +821,7 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
   }
   .paste-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-  #paste-scrim, #vet-scrim { z-index: 50; }
-  #vet-textarea { min-height: 160px; background: var(--surface-alt); }
+  #paste-scrim { z-index: 50; }
 
   .stage-badge {
     font-size: 0.72rem;
@@ -974,9 +973,6 @@
     <div class="section">
       <p class="section-title">Application</p>
       <div class="field-grid">
-        <div class="field span-2">
-          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
-        </div>
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
@@ -1068,17 +1064,6 @@
   <div class="paste-modal-actions">
     <button type="button" id="paste-cancel" class="btn">Cancel</button>
     <button type="button" id="paste-confirm" class="btn btn-primary">Add job</button>
-  </div>
-</div>
-
-<div class="scrim" id="vet-scrim"></div>
-<div class="paste-modal" id="vet-modal" aria-hidden="true" role="dialog" aria-labelledby="vet-modal-title">
-  <h2 id="vet-modal-title">Vet this job with Claude</h2>
-  <p id="vet-modal-hint">A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).</p>
-  <textarea id="vet-textarea" rows="6" readonly></textarea>
-  <div class="paste-modal-actions">
-    <button type="button" id="vet-copy" class="btn">Copy</button>
-    <button type="button" id="vet-close" class="btn btn-primary">Done</button>
   </div>
 </div>
 
@@ -2971,79 +2956,6 @@
     localSaveContacts();
     deleteContactFromDb(cid);
     closeContactDrawer();
-  });
-
-  // ---------- Vet this job with Claude ----------
-  // Opens a new Claude chat and gets the vetting prompt onto the clipboard. claude.ai
-  // doesn't reliably accept a prefilled message via URL, and clipboard writes can be
-  // silently blocked inside an embedded page (same lessons as the bookmarklet above),
-  // so the modal always shows the text pre-selected as a guaranteed manual-copy fallback.
-  var vetScrim = document.getElementById("vet-scrim");
-  var vetModal = document.getElementById("vet-modal");
-  var vetTextarea = document.getElementById("vet-textarea");
-
-  function buildVetPrompt(job) {
-    var lines = ["Vet this job:", ""];
-    var headline = job.position || "Untitled role";
-    if (job.company) headline += " at " + job.company;
-    lines.push(headline);
-    if (job.location) lines.push("Location: " + job.location);
-    if (job.postedSalary) lines.push("Posted salary: " + job.postedSalary);
-    if (job.postingUrl) lines.push("Posting link: " + job.postingUrl);
-    lines.push("");
-    if (job.description) {
-      lines.push("Job description:");
-      lines.push(job.description);
-    } else {
-      lines.push("(No job description saved yet.)");
-    }
-    return lines.join("\n");
-  }
-
-  function closeVetModal() {
-    vetScrim.classList.remove("open");
-    vetModal.classList.remove("open");
-    vetModal.setAttribute("aria-hidden", "true");
-  }
-
-  document.getElementById("vet-btn").addEventListener("click", async function () {
-    var job = findJob(state.activeId);
-    if (!job) return;
-    var prompt = buildVetPrompt(job);
-
-    window.open("https://claude.ai/new", "_blank");
-
-    vetTextarea.value = prompt;
-    vetScrim.classList.add("open");
-    vetModal.classList.add("open");
-    vetModal.setAttribute("aria-hidden", "false");
-    vetTextarea.focus();
-    vetTextarea.select();
-
-    var hint = document.getElementById("vet-modal-hint");
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(prompt);
-        hint.textContent = "A new Claude chat just opened, and this has been copied — paste it in there (Cmd/Ctrl+V).";
-      } else {
-        hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
-      }
-    } catch (e) {
-      hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
-    }
-  });
-
-  document.getElementById("vet-copy").addEventListener("click", async function () {
-    vetTextarea.focus();
-    vetTextarea.select();
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(vetTextarea.value);
-    } catch (e) { /* selection above still lets Cmd/Ctrl+C work */ }
-  });
-  document.getElementById("vet-close").addEventListener("click", closeVetModal);
-  vetScrim.addEventListener("click", closeVetModal);
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && vetModal.classList.contains("open")) closeVetModal();
   });
 
   // ---------- Confirm dialog ----------
