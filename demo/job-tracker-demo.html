@@ -1,0 +1,3362 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="UTF-8">
+<title>Job Tracker Demo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f5f7f8;
+    --surface: #ffffff;
+    --surface-alt: #eef1f4;
+    --surface-sunken: #e7ebee;
+    --ink: #1b2430;
+    --ink-muted: #5b6572;
+    --ink-faint: #8992a0;
+    --border: #dce1e7;
+    --border-strong: #c3cad2;
+    --accent: #2b6e63;
+    --accent-ink: #ffffff;
+    --accent-soft: #dceee9;
+    --accent-soft-ink: #1e5148;
+    --warn: #93691f;
+    --warn-soft: #f5ead2;
+    --danger: #a3453f;
+    --danger-soft: #f6dfdd;
+    --success: #2f7a52;
+    --rating-high: #1a9d4b;
+    --focus: #2b6e63;
+    --shadow: 0 12px 32px -12px rgba(27, 36, 48, 0.28);
+    --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.08);
+    --radius: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c;
+      --surface: #1a2029;
+      --surface-alt: #212834;
+      --surface-sunken: #0e1218;
+      --ink: #e9edf2;
+      --ink-muted: #a2acb9;
+      --ink-faint: #6b7484;
+      --border: #2c3441;
+      --border-strong: #3a4453;
+      --accent: #5aab9b;
+      --accent-ink: #0d1a17;
+      --accent-soft: #1e3833;
+      --accent-soft-ink: #8fd0c0;
+      --warn: #d3ac5e;
+      --warn-soft: #3a3120;
+      --danger: #e18c85;
+      --danger-soft: #3c2422;
+      --success: #6fbb8e;
+      --rating-high: #3ddc73;
+      --focus: #5aab9b;
+      --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #12161c;
+    --surface: #1a2029;
+    --surface-alt: #212834;
+    --surface-sunken: #0e1218;
+    --ink: #e9edf2;
+    --ink-muted: #a2acb9;
+    --ink-faint: #6b7484;
+    --border: #2c3441;
+    --border-strong: #3a4453;
+    --accent: #5aab9b;
+    --accent-ink: #0d1a17;
+    --accent-soft: #1e3833;
+    --accent-soft-ink: #8fd0c0;
+    --warn: #d3ac5e;
+    --warn-soft: #3a3120;
+    --danger: #e18c85;
+    --danger-soft: #3c2422;
+    --success: #6fbb8e;
+    --rating-high: #3ddc73;
+    --focus: #5aab9b;
+    --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: min(2200px, 96vw);
+    margin: 0 auto;
+    padding: 28px 28px 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Header ---------- */
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .topbar h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .topbar .sub {
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    min-width: 76px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .stat .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .stat .l {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+
+  .global-search {
+    margin-bottom: 14px;
+  }
+  .global-search .search-field { width: min(360px, 100%); }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 0;
+  }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    border-bottom: none;
+    background: var(--surface-alt);
+    color: var(--ink-muted);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.86rem;
+    padding: 9px 18px 8px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tab .count {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 6px;
+    color: var(--ink-faint);
+  }
+
+  .tab[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--ink);
+    border-bottom: 1px solid var(--surface);
+  }
+
+  .tab[aria-selected="true"] .count {
+    color: var(--ink-muted);
+  }
+
+  /* While a search is active, every tab's count badge switches from its normal
+     total to a match count for that tab — highlighted so it reads as "results
+     here" rather than being mistaken for the usual total. */
+  .tab .count.match-count {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-soft-ink);
+    font-weight: 700;
+  }
+
+  .tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---------- Table shell ---------- */
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 0 8px 8px 8px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+
+  .search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: min(280px, 100%);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    width: 15px; height: 15px;
+    color: var(--ink-faint);
+    pointer-events: none;
+  }
+
+  .search-field input {
+    width: 100%;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 7px 28px 7px 30px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .search-field input:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .search-field input::placeholder { color: var(--ink-faint); }
+
+  .search-field #search-clear {
+    position: absolute;
+    right: 6px;
+    border: none;
+    background: transparent;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 0.72rem;
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .search-field #search-clear:hover { background: var(--surface-sunken); color: var(--ink); }
+  .search-field.has-value #search-clear { display: flex; }
+
+  .sort-hint {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
+  .sheet-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* A persistent, visible scrollbar — macOS hides overflow scrollbars by default until
+       actively scrolling, which made horizontal scroll here easy to miss entirely. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) var(--surface-alt);
+  }
+  .sheet-scroll::-webkit-scrollbar { height: 11px; }
+  .sheet-scroll::-webkit-scrollbar-track { background: var(--surface-alt); }
+  .sheet-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 6px;
+    border: 2px solid var(--surface-alt);
+  }
+  .sheet-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 980px;
+    table-layout: fixed;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-alt);
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+    font-weight: 600;
+    padding: 9px 10px;
+    /* Heavy border + drop shadow, same treatment as the pinned Actions column —
+       reads as a fixed panel sitting above the rows at any scroll position. */
+    border-bottom: 3px solid var(--ink-muted);
+    box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.35);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    z-index: 1;
+  }
+
+  /* The last column keeps its right border (unlike a typical last-child reset) — with
+     the table no longer stretched to fill its container, that border is what marks
+     where real columns end and blank canvas begins. */
+
+  thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th.sortable:hover { color: var(--ink); background: var(--surface-sunken); }
+
+  .col-resizer {
+    position: absolute;
+    top: 0; right: -3px; bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 4;
+    touch-action: none;
+  }
+  .col-resizer::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 3px;
+    width: 2px;
+    background: transparent;
+  }
+  .col-resizer:hover::after, .col-resizer.dragging::after { background: var(--accent); }
+  body.col-resizing { cursor: col-resize !important; user-select: none; }
+  body.col-resizing * { cursor: col-resize !important; }
+  thead th.sortable .arrow {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0;
+    color: var(--accent);
+  }
+  thead th.sortable.active .arrow { opacity: 1; }
+  thead th.sortable.active { color: var(--ink); }
+  thead th:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  tbody td {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    vertical-align: middle;
+    overflow: hidden;
+  }
+
+
+  tbody tr:hover { background: var(--surface-alt); }
+  tbody tr:hover td { background: var(--surface-alt); }
+
+  /* Actions column stays put while the rest of the sheet scrolls horizontally. It carries
+     a permanent tint (not just on hover) plus a heavy border and a drop shadow, so it
+     reads as a distinct pinned panel at any scroll position — not just a thin line that
+     gets lost once other columns are sliding past it. */
+  .actions-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface-alt) !important;
+    border-right: 3px solid var(--ink-muted) !important;
+    box-shadow: 6px 0 10px -6px rgba(0, 0, 0, 0.35);
+  }
+  thead th.actions-col { z-index: 3; background: var(--surface-sunken) !important; }
+  tbody tr:hover td.actions-col { background: var(--surface-sunken) !important; }
+
+  tbody input, tbody select {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 8px 10px;
+    border-radius: 4px;
+  }
+
+  tbody input[type="number"] { font-family: "IBM Plex Mono", monospace; }
+  tbody input[type="date"] { font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; }
+
+  tbody input:hover, tbody select:hover { background: var(--surface-sunken); }
+  tbody input:focus, tbody select:focus {
+    outline: none;
+    border-color: var(--focus);
+    background: var(--surface);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 25%, transparent);
+  }
+
+  .col-position input, .col-company input { font-weight: 600; }
+
+  .cell-num { text-align: right; }
+  .cell-num input { text-align: right; }
+
+  input.low-rating, .field input.low-rating {
+    color: var(--danger);
+    font-weight: 600;
+  }
+
+  input.high-rating, .field input.high-rating {
+    color: var(--rating-high);
+    font-weight: 700;
+  }
+
+  .chk-cell { text-align: center; }
+  .chk-cell input[type="checkbox"] {
+    width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer;
+  }
+
+  .stars-cell {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    height: 100%;
+    padding: 0 6px;
+  }
+  .star-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--ink-faint);
+    cursor: pointer;
+  }
+  .star-btn.filled { color: var(--warn); }
+  .star-btn:hover, .star-btn:focus-visible { color: var(--warn); }
+  .star-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 2px; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill-remote { background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .pill-hybrid { background: var(--warn-soft); color: var(--warn); }
+  .pill-onsite { background: var(--surface-sunken); color: var(--ink-muted); }
+
+  select.loc-select {
+    -webkit-appearance: none; appearance: none;
+    cursor: pointer;
+  }
+
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+
+  /* Contacts tab: plain read-only cells (no <input>, so they need their own padding)
+     plus in-app "link" buttons that behave like <a> but open a drawer instead of a URL. */
+  .cell-text {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cell-text a { color: var(--accent); text-decoration: none; }
+  .cell-text a:hover { text-decoration: underline; }
+  .link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.82rem;
+    color: var(--accent);
+    cursor: pointer;
+    text-align: left;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-btn:hover { text-decoration: underline; }
+  .link-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* The td itself stays a plain block box so table-layout:fixed holds it to the exact
+     column width every row — putting display:flex directly on a table cell let its
+     content push that cell wider than its header in some rows, throwing columns out of
+     alignment. All the flex layout lives on this inner wrapper instead, which is forced
+     to the cell's own width and can't expand it. */
+  .linkedin-cell { padding: 0; }
+  .linkedin-inner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    padding-right: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .linkedin-inner input { flex: 1 1 auto; min-width: 0; }
+  .linkedin-inner a.icon-btn { flex: none; text-decoration: none; }
+
+  /* Drawer version of the same input + "open" affordance (Company URL, Job posting
+     link, LinkedIn) — plain flex is fine here since these live in a CSS grid, not a
+     fixed-layout table. */
+  .url-input-row { display: flex; align-items: center; gap: 6px; }
+  .url-input-row input { flex: 1 1 auto; min-width: 0; }
+  .url-input-row a.icon-btn { flex: none; text-decoration: none; }
+  .url-input-row a.icon-btn.disabled { opacity: 0.35; pointer-events: none; }
+
+  .icon-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-muted);
+    border-radius: 6px;
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    flex: none;
+  }
+  .icon-btn:hover { background: var(--surface-alt); color: var(--ink); border-color: var(--border-strong); }
+  .icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+  }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 8px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: var(--surface-alt); border-color: var(--border-strong); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary.danger-btn { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .empty {
+    padding: 56px 24px;
+    text-align: center;
+    color: var(--ink-muted);
+  }
+  .empty h2 { color: var(--ink); font-size: 1.05rem; margin: 0 0 6px; }
+  .empty p { margin: 0 0 16px; font-size: 0.88rem; }
+
+  /* ---------- Drawer ---------- */
+  .scrim {
+    position: fixed; inset: 0;
+    background: rgba(15, 19, 24, 0.42);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 40;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(1120px, 100vw);
+    background: var(--surface);
+    border-left: 1px solid var(--border-strong);
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(.32,.72,.35,1);
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drawer, .scrim { transition: none; }
+  }
+
+  .drawer-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex: none;
+  }
+
+  .drawer-head .titles input {
+    font-size: 1.15rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font-family: inherit;
+    width: 100%;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+  .drawer-head .titles input.company {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+  }
+  .drawer-head .titles input:hover { background: var(--surface-sunken); }
+  .drawer-head .titles input:focus {
+    outline: none; border-color: var(--focus); background: var(--surface-alt);
+  }
+
+  .drawer-body {
+    padding: 18px 22px 40px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .section {
+    margin-bottom: 26px;
+  }
+
+  .section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--ink-muted);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-subtitle {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: -4px 0 8px;
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.span-2 { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  .field input, .field select, .field textarea {
+    font: inherit;
+    font-size: 0.86rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 7px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .field textarea { resize: vertical; min-height: 64px; font-family: inherit; line-height: 1.45; }
+  .field textarea.tall { min-height: 140px; }
+  .field.checkline { flex-direction: row; align-items: center; gap: 8px; }
+  .field.checkline input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .field.checkline label { font-size: 0.86rem; color: var(--ink); }
+
+  .card-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--surface-alt);
+    position: relative;
+  }
+
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
+
+  .card .rm {
+    position: absolute; top: 8px; right: 8px;
+  }
+
+  .entry-card { display: flex; flex-direction: column; gap: 8px; }
+  .entry-head { display: flex; align-items: center; gap: 10px; }
+  .entry-head input[type="date"] {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.82rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .entry-card textarea {
+    font: inherit; font-size: 0.85rem; line-height: 1.45;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    border-radius: 6px; padding: 8px; min-height: 56px; resize: vertical;
+  }
+  .entry-card textarea:focus, .entry-head input:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+
+  .ghost-btn {
+    border: 1px dashed var(--border-strong);
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+  }
+  .ghost-btn:hover { background: var(--surface-alt); color: var(--accent); border-color: var(--accent); }
+
+  .drawer-foot {
+    border-top: 1px solid var(--border);
+    padding: 12px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: none;
+    background: var(--surface);
+  }
+
+  .paste-modal {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.97);
+    width: min(440px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    z-index: 51;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+  .paste-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+  @media (prefers-reduced-motion: reduce) { .paste-modal { transition: none; } }
+  .paste-modal h2 { margin: 0 0 8px; font-size: 1.05rem; font-weight: 700; }
+  .paste-modal p { margin: 0 0 12px; font-size: 0.84rem; color: var(--ink-muted); line-height: 1.45; }
+  .paste-modal textarea {
+    width: 100%; min-height: 92px; font: inherit; font-size: 0.84rem; line-height: 1.5;
+    border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px;
+    background: var(--surface); color: var(--ink); resize: vertical;
+  }
+  .paste-modal textarea:focus {
+    outline: none; border-color: var(--focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+  }
+  .paste-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  #paste-scrim, #vet-scrim { z-index: 50; }
+  #vet-textarea { min-height: 160px; background: var(--surface-alt); }
+
+  .stage-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .stage-jobs { background: var(--surface-sunken); color: var(--ink-muted); }
+  .stage-applied { background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .stage-interviewing { background: var(--warn-soft); color: var(--warn); }
+  .stage-rejected { background: var(--danger-soft); color: var(--danger); }
+
+  .sync-status {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sync-status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ink-faint);
+    flex: none;
+  }
+  .sync-status.on .dot { background: var(--success); }
+  .sync-status.off .dot { background: var(--warn); }
+
+  .export-link {
+    border: none;
+    background: none;
+    color: var(--ink-faint);
+    font: inherit;
+    font-size: 0.72rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 2px;
+  }
+  .export-link:hover { color: var(--accent); }
+  .export-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .bookmarklet-hint { color: var(--ink-faint); font-size: 0.72rem; }
+
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  ::selection { background: var(--accent-soft); }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div>
+      <h1>Job Tracker <span style="font-size:0.7rem;font-weight:600;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;">Demo — sample data</span></h1>
+      <div class="sub">Your search, one sheet at a time. <span class="sync-status" id="sync-status"><span class="dot"></span><span id="sync-status-text">Checking sync…</span></span> <button type="button" id="export-btn" class="export-link">Export backup</button> · <a href="#" id="bookmarklet-link" class="export-link">+ Add-job bookmarklet</a> <span class="bookmarklet-hint">(drag to your bookmarks bar)</span></div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="global-search">
+    <div class="search-field">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input type="text" id="search-input" placeholder="Search all jobs and contacts by company, title, or name">
+      <button type="button" id="search-clear" aria-label="Clear search">✕</button>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Job tracker stages">
+    <button class="tab" role="tab" data-stage="jobs" aria-selected="true">Jobs <span class="count" id="count-jobs">0</span></button>
+    <button class="tab" role="tab" data-stage="applied" aria-selected="false">Applied <span class="count" id="count-applied">0</span></button>
+    <button class="tab" role="tab" data-stage="interviewing" aria-selected="false">Interviewing <span class="count" id="count-interviewing">0</span></button>
+    <button class="tab" role="tab" data-stage="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
+    <button class="tab" role="tab" data-stage="contacts" aria-selected="false">Contacts <span class="count" id="count-contacts">0</span></button>
+  </nav>
+
+  <div class="sheet">
+    <div class="toolbar">
+      <span class="sort-hint" id="sort-hint"></span>
+    </div>
+    <div class="sheet-scroll">
+      <table id="table">
+        <colgroup id="colgroup"></colgroup>
+        <thead><tr id="thead-row"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="add-row" id="add-row">
+      <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
+      <button class="btn" id="paste-btn" type="button">+ Paste from bookmarklet</button>
+    </div>
+    <div class="add-row" id="contacts-add-row" style="display:none;">
+      <button class="btn btn-primary" id="add-contact-standalone" type="button">+ Add contact</button>
+      <button class="btn" id="paste-btn-contacts" type="button">+ Paste from bookmarklet</button>
+      <span class="bookmarklet-hint">Or add one from any job's detail view.</span>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="titles">
+      <input type="text" id="d-position" class="position" placeholder="Job position" aria-label="Job position">
+      <input type="text" id="d-company" class="company" placeholder="Company name" aria-label="Company name">
+    </div>
+    <button class="icon-btn" id="d-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body">
+
+    <div class="section">
+      <p class="section-title">Role details</p>
+      <div class="field-grid">
+        <div class="field"><label for="d-date">Posted</label><input type="date" id="d-date"></div>
+        <div class="field"><label for="d-location">Location</label>
+          <select id="d-location"><option value="Remote">Remote</option><option value="Hybrid">Hybrid</option><option value="On-site">On-site</option></select>
+        </div>
+        <div class="field"><label>Excitement</label><div class="stars-cell" id="d-excitement-stars"></div></div>
+        <div class="field"><label for="d-reviewPercent">G Rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
+        <div class="field"><label for="d-reviewCount">G Reviews</label><input type="text" inputmode="numeric" id="d-reviewCount"></div>
+        <div class="field"><label for="d-indeedRating">I Ratings (out of 5)</label><input type="number" id="d-indeedRating" min="0" max="5" step="0.1"></div>
+        <div class="field"><label for="d-indeedReviewCount">I Reviews</label><input type="text" inputmode="numeric" id="d-indeedReviewCount"></div>
+        <div class="field"><label for="d-postedSalary">Posted salary</label><input type="text" id="d-postedSalary" placeholder="e.g. $110k – $130k"></div>
+        <div class="field"><label for="d-salaryAsk">Salary ask</label><input type="text" id="d-salaryAsk" placeholder="e.g. $125k"></div>
+        <div class="field"><label for="d-pto">PTO</label><input type="text" id="d-pto" placeholder="e.g. 15 days + holidays"></div>
+        <div class="field"><label for="d-medical">Medical</label><input type="text" id="d-medical" placeholder="e.g. Blue Cross PPO, 80% covered"></div>
+        <div class="field span-2"><label for="d-companyUrl">Company URL</label>
+          <div class="url-input-row"><a class="icon-btn" id="d-companyUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-companyUrl" placeholder="https://"></div>
+        </div>
+        <div class="field span-2"><label for="d-postingUrl">Job posting link</label>
+          <div class="url-input-row"><a class="icon-btn" id="d-postingUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-postingUrl" placeholder="https://"></div>
+        </div>
+        <div class="field span-2"><label for="d-description">Job description</label><textarea id="d-description" class="tall" placeholder="Paste the full posting text here"></textarea></div>
+        <div class="field span-2"><label for="d-linkedinPosting">LinkedIn posting</label>
+          <div class="url-input-row"><a class="icon-btn" id="d-linkedinPosting-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="d-linkedinPosting" placeholder="https://"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">General notes</p>
+      <p class="section-subtitle">Culture, values, or anything else worth remembering about this one</p>
+      <textarea id="d-values" style="width:100%; min-height:100px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Culture, values, or anything else worth remembering"></textarea>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Application</p>
+      <div class="field-grid">
+        <div class="field span-2">
+          <button class="btn" id="vet-btn" type="button">Vet this job with Claude →</button>
+        </div>
+        <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
+        <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
+        <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Rejected</p>
+      <div class="field-grid">
+        <div class="field"><label for="d-dateRejected">Date rejected</label><input type="date" id="d-dateRejected"></div>
+        <div class="field"><label for="d-rejectionReason">Reason</label>
+          <select id="d-rejectionReason"><option value="">—</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option><option value="Ghosted">Ghosted</option><option value="Pass">Pass</option></select>
+        </div>
+        <div class="field span-2" id="dealbreakers-field" style="display:none;">
+          <label for="d-dealbreakers">Dealbreakers</label>
+          <textarea id="d-dealbreakers" placeholder="What made this a pass?"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Contacts</p>
+      <div class="card-list" id="contacts-list"></div>
+      <button class="ghost-btn" id="add-contact" type="button" style="margin-top:8px;">+ Add contact</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Interviews</p>
+      <div class="card-list" id="interviews-list"></div>
+      <button class="ghost-btn" id="add-interview" type="button" style="margin-top:8px;">+ Add interview</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Follow-ups</p>
+      <div class="card-list" id="followups-list"></div>
+      <button class="ghost-btn" id="add-followup" type="button" style="margin-top:8px;">+ Add follow-up</button>
+    </div>
+
+  </div>
+  <div class="drawer-foot">
+    <span class="stage-badge" id="d-stage-badge">Jobs</span>
+    <button class="icon-btn danger" id="d-delete" type="button" aria-label="Delete record" title="Delete record">🗑</button>
+  </div>
+</aside>
+
+<div class="scrim" id="cd-scrim"></div>
+<aside class="drawer" id="cd-drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="titles">
+      <input type="text" id="cd-name" class="position" placeholder="Contact name" aria-label="Contact name">
+      <input type="text" id="cd-connection" class="company" placeholder="Connection (e.g. Recruiter, Referral)" aria-label="Connection">
+    </div>
+    <button class="icon-btn" id="cd-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="section">
+      <p class="section-title">Contact details</p>
+      <div class="field-grid">
+        <div class="field"><label for="cd-phone">Phone number</label><input type="tel" id="cd-phone" placeholder="e.g. (555) 123-4567"></div>
+        <div class="field"><label for="cd-email">Email address</label><input type="email" id="cd-email" placeholder="name@company.com"></div>
+        <div class="field"><label for="cd-linkedin">LinkedIn</label>
+          <div class="url-input-row"><a class="icon-btn" id="cd-linkedin-open" href="#" target="_blank" rel="noopener" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."></div>
+        </div>
+        <div class="field"><label for="cd-dateOfContact">Date of contact</label><input type="date" id="cd-dateOfContact"></div>
+        <div class="field span-2">
+          <label for="cd-company">Company</label>
+          <input type="text" id="cd-company" placeholder="Company name">
+          <button type="button" class="btn" id="cd-company-link" style="width:100%; justify-content:flex-start; display:none;"></button>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <p class="section-title">Notes</p>
+      <textarea id="cd-notes" style="width:100%; min-height:120px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Anything worth remembering about this contact"></textarea>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <span class="stage-badge stage-applied">Contact</span>
+    <button class="icon-btn danger" id="cd-delete" type="button" aria-label="Delete contact" title="Delete contact">🗑</button>
+  </div>
+</aside>
+
+<div class="scrim" id="paste-scrim"></div>
+<div class="paste-modal" id="paste-modal" aria-hidden="true" role="dialog" aria-labelledby="paste-modal-title">
+  <h2 id="paste-modal-title">Paste from bookmarklet</h2>
+  <p>Click "+ Add-job bookmarklet" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).</p>
+  <textarea id="paste-textarea" rows="4" placeholder="Position: ...&#10;Company: ...&#10;Posting: ..."></textarea>
+  <p id="paste-error" style="display:none; margin:8px 0 0; font-size:0.8rem; color:var(--danger);"></p>
+  <div class="paste-modal-actions">
+    <button type="button" id="paste-cancel" class="btn">Cancel</button>
+    <button type="button" id="paste-confirm" class="btn btn-primary">Add job</button>
+  </div>
+</div>
+
+<div class="scrim" id="vet-scrim"></div>
+<div class="paste-modal" id="vet-modal" aria-hidden="true" role="dialog" aria-labelledby="vet-modal-title">
+  <h2 id="vet-modal-title">Vet this job with Claude</h2>
+  <p id="vet-modal-hint">A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).</p>
+  <textarea id="vet-textarea" rows="6" readonly></textarea>
+  <div class="paste-modal-actions">
+    <button type="button" id="vet-copy" class="btn">Copy</button>
+    <button type="button" id="vet-close" class="btn btn-primary">Done</button>
+  </div>
+</div>
+
+<div class="scrim" id="confirm-scrim"></div>
+<div class="paste-modal" id="confirm-modal" aria-hidden="true" role="alertdialog" aria-labelledby="confirm-message">
+  <p id="confirm-message" style="margin:0 0 16px; font-size:0.92rem; color:var(--ink); line-height:1.5;">Are you sure?</p>
+  <div class="paste-modal-actions">
+    <button type="button" id="confirm-cancel" class="btn">Cancel</button>
+    <button type="button" id="confirm-ok" class="btn btn-primary danger-btn">Delete</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "jobTrackerData.v1";
+  var COLWIDTH_KEY = "jobTrackerColWidths.v1";
+  var state = { activeStage: "jobs", activeId: null, jobs: [], contacts: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
+
+  function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  // True while a cell in the main sheet (not the drawer, which has its own state.activeId /
+  // cdActiveId guard) is focused for editing. A cloud sync delivery arriving mid-edit —
+  // e.g. the debounced write from this same keystroke, landing ~500ms later — must not
+  // rebuild the table underneath the viewer's cursor, or it silently steals focus and
+  // cuts off typing partway through, which read like a "timeout."
+  function isEditingInline() {
+    var el = document.activeElement;
+    return !!(el && el.closest && el.closest("#tbody"));
+  }
+
+  // The single source of truth for "is it safe to let an incoming cloud sync snapshot
+  // replace local state right now?" Covers every way local data can be ahead of what the
+  // server has confirmed: a drawer open, a cell focused, or a write still scheduled/in
+  // flight. Closing a drawer or blurring a cell doesn't by itself mean the write landed —
+  // only flushPendingWrites()/flushPendingContactWrites() finishing does — so the pending/
+  // in-flight checks are what actually close the "edit, close, get reverted" race.
+  function isSyncSensitive() {
+    return !!(state.activeId || cdActiveId || isEditingInline() || hasPendingJobWrites() || hasPendingContactWrites());
+  }
+
+  function loadColWidths() {
+    try {
+      var raw = localStorage.getItem(COLWIDTH_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") return parsed;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return {};
+  }
+
+  function saveColWidths() {
+    try { localStorage.setItem(COLWIDTH_KEY, JSON.stringify(state.colWidths)); } catch (e) { /* per-device preference only; safe to skip */ }
+  }
+
+  // Jobs saved before an array-shaped field existed (or round-tripped through a
+  // store that turns an empty array into `{}`) can load with contacts/interviews/
+  // followups missing or non-array — which silently breaks every "+ Add" button
+  // for that record, since `.push()` on a non-array throws. normalizeJob() already
+  // guards this for cloud-loaded jobs; apply the same guard here so a job loaded
+  // straight from localStorage gets it too.
+  function ensureEntryArrays(job) {
+    if (!Array.isArray(job.contacts)) job.contacts = [];
+    if (!Array.isArray(job.interviews)) job.interviews = [];
+    if (!Array.isArray(job.followups)) job.followups = [];
+    return job;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.jobs)) return parsed.jobs.map(ensureEntryArrays);
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return [];
+  }
+
+  function localSave() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobs: state.jobs }));
+    } catch (e) { /* storage unavailable; edits stay in-memory for this session */ }
+  }
+
+  // ---------- Cloud sync (db capability) ----------
+  // localStorage is per-browser only, so a record made here is invisible from a
+  // different browser or device. When the "db" capability is granted, every write
+  // also goes to the artifact's shared document store, keyed by job id, so the
+  // same tracker is reachable from anywhere the viewer is signed in.
+  var dbApi = null;
+  var jobsCol = null;
+  var writeTimers = {};
+  var pendingWrites = {};   // id -> the write fn, so a debounced write can be flushed early
+  var inFlightWrites = {};  // id -> Date.now() when its .set() call started (see STALE_WRITE_MS)
+  // If a write's promise never settles — e.g. the network request got dropped while
+  // the tab was backgrounded/asleep and the underlying SDK never rejects — inFlightWrites
+  // would otherwise stay populated forever, which through isSyncSensitive() blocks every
+  // future cloud update from ever being applied until the page is reloaded. Treating an
+  // in-flight write as stale after this long lets sync recover on its own instead.
+  var STALE_WRITE_MS = 20000;
+  var syncStatusEl = document.getElementById("sync-status");
+  var syncStatusText = document.getElementById("sync-status-text");
+
+  function setSyncStatus(mode, text) {
+    if (!syncStatusEl) return;
+    syncStatusEl.className = "sync-status" + (mode ? " " + mode : "");
+    syncStatusText.textContent = text;
+  }
+
+  function cloneJob(job) {
+    return JSON.parse(JSON.stringify(job));
+  }
+
+  function normalizeJob(data) {
+    var j = blankJob();
+    Object.keys(j).forEach(function (k) {
+      if (data && data[k] !== undefined) j[k] = data[k];
+    });
+    if (data && data.id) j.id = data.id;
+    // The cloud store round-trips through JSON; guard against contacts/interviews/
+    // followups coming back as anything but an array (e.g. an empty-array quirk in the
+    // underlying store), which would otherwise make every "+ Add" button silently throw.
+    if (!Array.isArray(j.contacts)) j.contacts = [];
+    if (!Array.isArray(j.interviews)) j.interviews = [];
+    if (!Array.isArray(j.followups)) j.followups = [];
+    // The db capability hands back snapshot data that's frozen (non-extensible), to stop
+    // callers from mutating its cache. Fields copied straight from `data` above (like these
+    // arrays) carry that freeze with them, so `.push()` on job.interviews/followups/contacts
+    // for any cloud-loaded job throws "object is not extensible" — this deep clone guarantees
+    // everything on `j` is a fresh, mutable copy no matter what the SDK gave us.
+    return JSON.parse(JSON.stringify(j));
+  }
+
+  function save(job, immediate) {
+    // Bumped on every save, local-only or not — this is what lets mergeJobsFromSnapshot
+    // tell a just-edited local job apart from a stale/lagging snapshot of the same job
+    // that doesn't reflect the edit yet (see that function for why that distinction matters).
+    job.updatedAt = Date.now();
+    localSave();
+    if (!jobsCol || !job) return;
+    var id = job.id;
+    if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
+    var body = cloneJob(job);
+    var doWrite = function () {
+      delete writeTimers[id];
+      delete pendingWrites[id];
+      inFlightWrites[id] = Date.now();
+      jobsCol.doc(id).set(body)
+        .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
+        .finally(function () { delete inFlightWrites[id]; });
+    };
+    if (immediate) { doWrite(); }
+    else { pendingWrites[id] = doWrite; writeTimers[id] = setTimeout(doWrite, 500); }
+  }
+
+  // Sends any still-debounced job writes right now instead of waiting out their timer —
+  // called when a place a viewer could edit from (the drawer, an inline cell) stops being
+  // actively edited, so a save is never left pending once nothing protects it anymore.
+  function flushPendingWrites() {
+    Object.keys(pendingWrites).forEach(function (id) {
+      var fn = pendingWrites[id];
+      clearTimeout(writeTimers[id]);
+      delete writeTimers[id];
+      delete pendingWrites[id];
+      fn();
+    });
+  }
+
+  // True while any job write is scheduled, in flight, or (via the contacts counterparts
+  // defined below) the same for a contact — a cloud sync delivery arriving in that window
+  // could be stale relative to it, so callers must not let it overwrite local state.
+  function hasPendingJobWrites() {
+    if (Object.keys(writeTimers).length > 0) return true;
+    return Object.keys(inFlightWrites).some(function (id) { return Date.now() - inFlightWrites[id] < STALE_WRITE_MS; });
+  }
+
+  function deleteFromDb(id) {
+    if (!jobsCol) return;
+    if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
+    jobsCol.doc(id).delete().catch(function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+  }
+
+  // Applying a fetched/pushed snapshot by wholesale-replacing state.jobs is unsafe: a
+  // read (get() or even a live onSnapshot delivery) isn't guaranteed to already reflect
+  // a write this same session just made — it can lag by a moment. Replacing outright
+  // then makes a job that's genuinely saved fine flicker out of view (or, worse, get
+  // written back out with localSave() and stay gone until something else corrects it).
+  // Merging instead — add/update anything the snapshot has, but never drop a local job
+  // just because this particular snapshot doesn't (yet) include it — makes sync eventually
+  // consistent without ever being destructively wrong. Real deletions only ever happen
+  // through the app's own explicit delete action, which already removes the local copy
+  // directly; they were never inferred from a job's absence in a snapshot.
+  //
+  // That's enough for a job the snapshot doesn't have at all, but it's not enough for one
+  // it DOES have: if the snapshot's own copy of an existing job is itself stale (same lag,
+  // just not total absence — a background onSnapshot delivery queued before the viewer's
+  // last edit confirmed, then arriving after), blindly trusting the snapshot for any id it
+  // recognizes silently reverts that edit. updatedAt (bumped on every save(), local-only
+  // writes included) is what tells the two apart — the side that was actually touched more
+  // recently wins, whichever side that is.
+  function newerRecord(remote, local) {
+    if (!local) return remote;
+    return (remote.updatedAt || 0) >= (local.updatedAt || 0) ? remote : local;
+  }
+  function mergeJobsFromSnapshot(remoteJobs) {
+    var byId = {};
+    state.jobs.forEach(function (j) { byId[j.id] = j; });
+    remoteJobs.forEach(function (rj) { byId[rj.id] = newerRecord(rj, byId[rj.id]); });
+    var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+    merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    state.jobs = merged;
+  }
+  function mergeContactsFromSnapshot(remoteContacts) {
+    var byId = {};
+    state.contacts.forEach(function (c) { byId[c.id] = c; });
+    remoteContacts.forEach(function (rc) { byId[rc.id] = newerRecord(rc, byId[rc.id]); });
+    var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+    merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    state.contacts = merged;
+  }
+
+  async function initCloudSync() {
+    if (!window.claude || typeof window.claude.use !== "function") {
+      setSyncStatus("off", "Saved on this device only");
+      return;
+    }
+    try {
+      dbApi = await window.claude.use("db");
+    } catch (e) {
+      dbApi = null;
+    }
+    if (!dbApi) {
+      setSyncStatus("off", "Saved on this device only");
+      return;
+    }
+    jobsCol = dbApi.collection("jobs");
+    contactsCol = dbApi.collection("contacts");
+    try {
+      var snap = await jobsCol.orderBy("createdAt").get();
+      // If a drawer is already open by the time this resolves (e.g. the viewer opened
+      // a just-created job within the first moment of page load, before this fetch
+      // landed), applying this snapshot could silently wipe that job out of state.jobs —
+      // same race the live listener below already guards against. Also true while a
+      // contact's own drawer is open, since that edits a job object too.
+      if (!snap.empty && !isSyncSensitive()) {
+        mergeJobsFromSnapshot(snap.docs.map(function (d) { return normalizeJob(d.data()); }));
+        localSave();
+        renderTable();
+      } else if (snap.empty && state.jobs.length) {
+        state.jobs.forEach(function (j) { save(j, true); });
+      }
+    } catch (e) { /* keep whatever loaded from localStorage */ }
+
+    try {
+      var cSnap = await contactsCol.orderBy("createdAt").get();
+      if (!cSnap.empty && !isSyncSensitive()) {
+        mergeContactsFromSnapshot(cSnap.docs.map(function (d) { return normalizeContact(d.data()); }));
+        localSaveContacts();
+        renderTable();
+      } else if (cSnap.empty && state.contacts.length) {
+        state.contacts.forEach(function (c) { saveContact(c, true); });
+      }
+    } catch (e) { /* keep whatever loaded from localStorage */ }
+    migrateEmbeddedContacts();
+    migrateValuesNotes();
+
+    jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
+      if (isSyncSensitive()) return; // don't clobber an in-progress (or not-yet-confirmed) edit
+      mergeJobsFromSnapshot(snap.docs.map(function (d) { return normalizeJob(d.data()); }));
+      localSave();
+      migrateEmbeddedContacts();
+      migrateValuesNotes();
+      renderTable();
+    }, function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+
+    contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
+      if (isSyncSensitive()) return;
+      mergeContactsFromSnapshot(snap.docs.map(function (d) { return normalizeContact(d.data()); }));
+      localSaveContacts();
+      renderTable();
+    }, function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+
+    setSyncStatus("on", "Synced to your account");
+  }
+
+  // ---------- Export backup ----------
+  // Extra insurance beyond cloud sync: a manual, viewer-initiated download of everything,
+  // as a plain JSON file the viewer keeps for themselves.
+  var hasClaudeRuntime = !!(window.claude && typeof window.claude.use === "function");
+  var downloadsApi = null;
+  var exportBtn = document.getElementById("export-btn");
+
+  async function initExport() {
+    if (!hasClaudeRuntime) return; // plain browser tab: the blob fallback below just works
+    try { downloadsApi = await window.claude.use("downloads"); } catch (e) { downloadsApi = null; }
+    if (!downloadsApi) exportBtn.style.display = "none";
+  }
+
+  async function exportBackup() {
+    var payload = JSON.stringify({ exportedAt: new Date().toISOString(), jobs: state.jobs }, null, 2);
+    var filename = "job-tracker-backup-" + todayStr() + ".json";
+    var originalLabel = exportBtn.textContent;
+
+    if (downloadsApi) {
+      try {
+        await downloadsApi.save({ filename: filename, data: payload });
+        exportBtn.textContent = "Backup saved";
+      } catch (e) {
+        exportBtn.textContent = (!e || e.code !== "declined") ? "Couldn't save — try again" : originalLabel;
+      }
+      setTimeout(function () { exportBtn.textContent = originalLabel; }, 2200);
+      return;
+    }
+    if (hasClaudeRuntime) return; // capability unavailable; button is hidden, this is just a safeguard
+
+    var blob = new Blob([payload], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  exportBtn.addEventListener("click", exportBackup);
+
+  // ---------- "Add from this page" bookmarklet ----------
+  // A draggable javascript: link. On a job posting page it reads Schema.org JobPosting
+  // structured data when present (most ATSes emit it), falls back to guessing from the
+  // page title, copies a plain-text summary to the clipboard as a backup, and opens this
+  // tracker with the guess pre-filled so the viewer can confirm before it's saved.
+  // Address of YOUR published copy of this page. Only the bookmarklet uses it (to open the tracker
+  // after capturing a posting). Replace it with the link to your own artifact before using the bookmarklet.
+  var TRACKER_URL = "https://claude.ai/artifact/YOUR-ARTIFACT-ID";
+  var BOOKMARKLET_SRC = [
+    "(function(){",
+    "function meta(n){var e=document.querySelector('meta[property=\"'+n+'\"]')||document.querySelector('meta[name=\"'+n+'\"]');return e?e.content:'';}",
+    "function findJobPosting(){",
+    "var scripts=document.querySelectorAll('script[type=\"application/ld+json\"]');",
+    "for(var i=0;i<scripts.length;i++){",
+    "try{",
+    "var data=JSON.parse(scripts[i].textContent);",
+    "var items=Array.isArray(data)?data:(data['@graph']||[data]);",
+    "for(var j=0;j<items.length;j++){",
+    "var it=items[j];",
+    "if(it&&(it['@type']==='JobPosting'||(Array.isArray(it['@type'])&&it['@type'].indexOf('JobPosting')>-1)))return it;",
+    "}",
+    "}catch(e){}",
+    "}",
+    "return null;",
+    "}",
+    "var jp=findJobPosting();",
+    "var position='',company='',workMode='';",
+    "if(jp){",
+    "position=jp.title||'';",
+    "var ho=jp.hiringOrganization;",
+    "company=(ho&&(typeof ho==='string'?ho:ho.name))||'';",
+    "var loc=jp.jobLocationType||'';",
+    "if(/telecommute|remote/i.test(loc))workMode='Remote';",
+    "}",
+    "if(!position||!company){",
+    "var t=meta('og:title')||document.title||'';",
+    "var seps=[' at ',' - ',' | ',' — ',' :: '];",
+    "for(var s=0;s<seps.length;s++){",
+    "if(t.indexOf(seps[s])>-1){",
+    "var parts=t.split(seps[s]);",
+    "if(!position)position=parts[0].trim();",
+    "if(!company&&parts[1])company=parts[1].trim();",
+    "break;",
+    "}",
+    "}",
+    "if(!position)position=t;",
+    "}",
+    // A custom company careers page often has no JobPosting structured data and a
+    // <title> that doesn't split cleanly ("Position at Company") either — try a few
+    // more generic signals before giving up on company, since something (even an
+    // imperfect guess the viewer can fix in the drawer) beats a blank field.
+    "if(!company){",
+    "company=meta('og:site_name')||meta('application-name')||'';",
+    "}",
+    "if(!company){",
+    "try{",
+    "var host=window.location.hostname.replace(/^www\\./,'');",
+    "var genericLabel=/^(jobs|careers|apply|boards|jobs-boards|job-boards)$/i;",
+    "var labels=host.split('.');",
+    "for(var l=0;l<labels.length-1;l++){",
+    "if(labels[l]&&!genericLabel.test(labels[l])){",
+    "company=labels[l].charAt(0).toUpperCase()+labels[l].slice(1);",
+    "break;",
+    "}",
+    "}",
+    "}catch(e){}",
+    "}",
+    "var params=new URLSearchParams();",
+    "params.set('add','1');",
+    "params.set('position',position);",
+    "params.set('company',company);",
+    "params.set('postingUrl',window.location.href);",
+    "if(workMode)params.set('location',workMode);",
+    "if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText('Position: '+position+'\\nCompany: '+company+'\\nPosting: '+window.location.href).catch(function(){});}",
+    "window.open('" + TRACKER_URL + "?'+params.toString(),'_blank');",
+    "})();"
+  ].join("");
+  document.getElementById("bookmarklet-link").href = "javascript:" + BOOKMARKLET_SRC;
+  document.getElementById("bookmarklet-link").addEventListener("click", function (e) { e.preventDefault(); });
+
+  // Creates a job from captured {position, company, postingUrl, location} and opens it
+  // for review. Shared by the URL-param path (handleBookmarkletAdd) and the clipboard
+  // fallback (pasteFromBookmarklet) — claude.ai doesn't reliably pass the bookmarklet's
+  // URL parameters through, so the clipboard path is the one that actually works today.
+  function addJobFromCapture(fields) {
+    var job = blankJob();
+    job.date = todayStr();
+    job.position = fields.position || "";
+    job.company = fields.company || "";
+    job.postingUrl = fields.postingUrl || "";
+    if (fields.location === "Remote" || fields.location === "Hybrid" || fields.location === "On-site") {
+      job.location = fields.location;
+    }
+    state.jobs.push(job);
+    save(job, true);
+    state.activeStage = "jobs";
+    tabs.forEach(function (o) { o.setAttribute("aria-selected", o.getAttribute("data-stage") === "jobs" ? "true" : "false"); });
+    renderTable();
+    openDrawer(job.id);
+    return job;
+  }
+
+  function handleBookmarkletAdd() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("add") !== "1") return;
+    addJobFromCapture({
+      position: params.get("position"),
+      company: params.get("company"),
+      postingUrl: params.get("postingUrl"),
+      location: params.get("location")
+    });
+    history.replaceState(null, "", window.location.pathname);
+  }
+
+  // Parses the "Position: ...\nCompany: ...\nPosting: ..." text the bookmarklet copies
+  // to the clipboard. Tolerates the lines appearing in any order or with extra lines
+  // around them (in case the clipboard held something else appended after copying).
+  function parseBookmarkletClipboard(text) {
+    var fields = { position: "", company: "", postingUrl: "" };
+    (text || "").split("\n").forEach(function (line) {
+      var m = line.match(/^\s*(Position|Company|Posting)\s*:\s*(.*)$/i);
+      if (!m) return;
+      var key = m[1].toLowerCase();
+      var val = m[2].trim();
+      if (key === "position") fields.position = val;
+      else if (key === "company") fields.company = val;
+      else if (key === "posting") fields.postingUrl = val;
+    });
+    return fields;
+  }
+
+  // A dialog the viewer pastes into (Cmd/Ctrl+V), rather than reading the clipboard
+  // programmatically — the artifact runs in an embedded page where clipboard-read
+  // permission is often unavailable and navigator.clipboard.readText() can hang
+  // indefinitely instead of failing, which left the old version looking inert.
+  var pasteScrim = document.getElementById("paste-scrim");
+  var pasteModal = document.getElementById("paste-modal");
+  var pasteTextarea = document.getElementById("paste-textarea");
+  var pasteError = document.getElementById("paste-error");
+
+  function openPasteModal() {
+    pasteTextarea.value = "";
+    pasteError.style.display = "none";
+    pasteScrim.classList.add("open");
+    pasteModal.classList.add("open");
+    pasteModal.setAttribute("aria-hidden", "false");
+    setTimeout(function () { pasteTextarea.focus(); }, 50);
+  }
+  function closePasteModal() {
+    pasteScrim.classList.remove("open");
+    pasteModal.classList.remove("open");
+    pasteModal.setAttribute("aria-hidden", "true");
+  }
+  document.getElementById("paste-btn").addEventListener("click", openPasteModal);
+  // Same trigger, duplicated on the Contacts tab's add-row — the tracker remembers
+  // whichever tab was last open (even from a prior session) and can land you there
+  // when the bookmarklet opens a fresh page, and Contacts' own add-row otherwise has
+  // no way to reach the paste flow at all.
+  document.getElementById("paste-btn-contacts").addEventListener("click", openPasteModal);
+  document.getElementById("paste-cancel").addEventListener("click", closePasteModal);
+  pasteScrim.addEventListener("click", closePasteModal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pasteModal.classList.contains("open")) closePasteModal();
+  });
+  document.getElementById("paste-confirm").addEventListener("click", function () {
+    var fields = parseBookmarkletClipboard(pasteTextarea.value);
+    if (!fields.position && !fields.company && !fields.postingUrl) {
+      pasteError.textContent = "That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the job posting's page, copy again, then paste it here.";
+      pasteError.style.display = "block";
+      return;
+    }
+    pasteError.style.display = "none";
+    closePasteModal();
+    addJobFromCapture(fields);
+  });
+
+  function blankJob() {
+    return {
+      id: uid(), stage: "jobs", createdAt: Date.now(), updatedAt: Date.now(),
+      date: "", position: "", company: "", excitement: "",
+      reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
+      location: "Remote", pto: "", medical: "",
+      dateApplied: "", whereApplied: "", interviewing: false,
+      dateRejected: "", rejectionReason: "", dealbreakers: "",
+      companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
+      contacts: [], interviews: [], followups: []
+    };
+  }
+
+  // ---------- Contacts (top-level, same pattern as jobs) ----------
+  // Contacts are their own collection so they can exist without a job. jobId is set
+  // when a contact was added from (or later linked to) a specific job's detail view;
+  // it's null/empty for a standalone contact.
+  var CONTACTS_STORAGE_KEY = "jobTrackerContacts.v1";
+  var contactsCol = null;
+  var contactWriteTimers = {};
+  var pendingContactWrites = {};
+  var inFlightContactWrites = {};
+
+  function blankContact() {
+    return {
+      id: uid(), jobId: null, createdAt: Date.now(), updatedAt: Date.now(),
+      name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
+      // Snapshot of the linked job's company name. Kept in sync with the live job
+      // (see syncContactCompany) while it exists, so the name survives if that job is
+      // ever deleted instead of just vanishing along with it.
+      company: ""
+    };
+  }
+
+  // Refreshes a contact's company snapshot from its linked job, if any, and reports
+  // whether it changed (so callers only persist when something actually moved).
+  function syncContactCompany(c) {
+    if (!c.jobId) return false;
+    var job = findJob(c.jobId);
+    if (!job) return false;
+    var name = job.company || "";
+    if (c.company === name) return false;
+    c.company = name;
+    return true;
+  }
+
+  function loadContacts() {
+    try {
+      var raw = localStorage.getItem(CONTACTS_STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.contacts)) return parsed.contacts;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return [];
+  }
+
+  function localSaveContacts() {
+    try { localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify({ contacts: state.contacts })); } catch (e) { /* in-memory only for this session */ }
+  }
+
+  function saveContact(contact, immediate) {
+    contact.updatedAt = Date.now();
+    localSaveContacts();
+    if (!contactsCol || !contact) return;
+    var id = contact.id;
+    if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
+    var body = JSON.parse(JSON.stringify(contact));
+    var doWrite = function () {
+      delete contactWriteTimers[id];
+      delete pendingContactWrites[id];
+      inFlightContactWrites[id] = Date.now();
+      contactsCol.doc(id).set(body)
+        .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
+        .finally(function () { delete inFlightContactWrites[id]; });
+    };
+    if (immediate) { doWrite(); }
+    else { pendingContactWrites[id] = doWrite; contactWriteTimers[id] = setTimeout(doWrite, 500); }
+  }
+
+  function flushPendingContactWrites() {
+    Object.keys(pendingContactWrites).forEach(function (id) {
+      var fn = pendingContactWrites[id];
+      clearTimeout(contactWriteTimers[id]);
+      delete contactWriteTimers[id];
+      delete pendingContactWrites[id];
+      fn();
+    });
+  }
+
+  function hasPendingContactWrites() {
+    if (Object.keys(contactWriteTimers).length > 0) return true;
+    return Object.keys(inFlightContactWrites).some(function (id) { return Date.now() - inFlightContactWrites[id] < STALE_WRITE_MS; });
+  }
+
+  function deleteContactFromDb(id) {
+    if (!contactsCol) return;
+    if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
+    contactsCol.doc(id).delete().catch(function () { /* local copy still removed either way */ });
+  }
+
+  function normalizeContact(data) {
+    var c = blankContact();
+    Object.keys(c).forEach(function (k) {
+      if (data && data[k] !== undefined) c[k] = data[k];
+    });
+    if (data && data.id) c.id = data.id;
+    // Same frozen-snapshot issue as normalizeJob() — clone so nothing non-extensible
+    // survives onto the working copy.
+    return JSON.parse(JSON.stringify(c));
+  }
+
+  // One-time (idempotent) upgrade path: older records kept contacts nested inside
+  // job.contacts. Lifts any still found there into the top-level state.contacts so
+  // they behave exactly like every other contact, including the ones added standalone.
+  function migrateEmbeddedContacts() {
+    var touchedJobs = [], newContacts = [];
+    state.jobs.forEach(function (job) {
+      if (Array.isArray(job.contacts) && job.contacts.length) {
+        job.contacts.forEach(function (c) {
+          if (!c.jobId) c.jobId = job.id;
+          if (!state.contacts.some(function (x) { return x.id === c.id; })) {
+            state.contacts.push(c);
+            newContacts.push(c);
+          }
+        });
+        job.contacts = [];
+        touchedJobs.push(job);
+      }
+    });
+    if (touchedJobs.length || newContacts.length) {
+      localSaveContacts();
+      localSave();
+      touchedJobs.forEach(function (j) { save(j, true); });
+      newContacts.forEach(function (c) { saveContact(c, true); });
+    }
+  }
+
+  // One-time (idempotent) upgrade path: Company values and General notes used to be
+  // two separate fields; the drawer now has just one ("General notes", stored under
+  // the same `values` key values already used). Any job still carrying old `notes`
+  // content gets it folded into `values` and `notes` cleared, so nothing entered in
+  // either field is lost.
+  function migrateValuesNotes() {
+    var touched = [];
+    state.jobs.forEach(function (job) {
+      if (job.notes) {
+        job.values = job.values ? (job.values + "\n\n" + job.notes) : job.notes;
+        job.notes = "";
+        touched.push(job);
+      }
+    });
+    if (touched.length) {
+      localSave();
+      touched.forEach(function (j) { save(j, true); });
+    }
+  }
+
+
+  // ---- DEMO BUILD ONLY: fictional sample data, seeded once into an empty tracker ----
+  function seedDemoData() {
+    function d(offsetDays) {
+      var t = new Date(2026, 9, 5); t.setDate(t.getDate() + offsetDays);
+      return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    }
+    var n = 0;
+    function job(o) {
+      var j = Object.assign(blankJob(), o);
+      j.createdAt = Date.now() - (100 - n) * 3600000; j.updatedAt = j.createdAt; n++;
+      return j;
+    }
+    var jobs = [
+      job({ stage: "jobs", company: "Northwind Analytics", position: "Senior Product Manager", excitement: "4", reviewPercent: "4.3", reviewCount: "1280", indeedRating: "4.1", indeedReviewCount: "860", postedSalary: "$150k - $175k", location: "Remote", pto: "Unlimited", medical: "PPO, 90% covered", date: d(-3), postingUrl: "https://example.com/jobs/northwind-spm", values: "Strong remote culture, clear career ladders." }),
+      job({ stage: "jobs", company: "Contoso Health", position: "Product Owner, Platform", excitement: "3", reviewPercent: "3.6", reviewCount: "412", indeedRating: "3.4", indeedReviewCount: "205", postedSalary: "$135k - $150k", location: "Hybrid", date: d(-5), postingUrl: "https://example.com/jobs/contoso-po" }),
+      job({ stage: "jobs", company: "Fabrikam Robotics", position: "Technical Product Manager", excitement: "5", reviewPercent: "4.6", reviewCount: "2310", indeedRating: "4.4", indeedReviewCount: "1530", postedSalary: "$160k - $185k", location: "Remote", date: d(-1) }),
+      job({ stage: "applied", company: "Tailspin Software", position: "Product Manager II", excitement: "4", reviewPercent: "4.0", reviewCount: "930", indeedRating: "3.9", indeedReviewCount: "610", postedSalary: "$140k - $160k", salaryAsk: "$155k", location: "Remote", date: d(-18), dateApplied: d(-14), whereApplied: "Company site", followups: [{ id: "f1", date: d(-7), notes: "Emailed recruiter" }, { id: "f2", date: d(-2), notes: "Checked in again" }] }),
+      job({ stage: "applied", company: "Wingtip Cloud", position: "Senior Product Owner", excitement: "3", reviewPercent: "3.8", reviewCount: "275", indeedRating: "3.7", indeedReviewCount: "140", postedSalary: "$130k - $145k", salaryAsk: "$145k", location: "Hybrid", date: d(-20), dateApplied: d(-11), whereApplied: "LinkedIn" }),
+      job({ stage: "applied", company: "Litware Systems", position: "Product Manager", excitement: "2", reviewPercent: "3.2", reviewCount: "1890", indeedRating: "3.3", indeedReviewCount: "990", postedSalary: "$125k - $140k", salaryAsk: "$140k", location: "On-site", date: d(-25), dateApplied: d(-21), whereApplied: "Referral" }),
+      job({ stage: "interviewing", interviewing: true, company: "Adatum Corporation", position: "Lead Product Manager", excitement: "5", reviewPercent: "4.5", reviewCount: "3120", indeedRating: "4.3", indeedReviewCount: "2040", postedSalary: "$165k - $190k", salaryAsk: "$185k", location: "Remote", date: d(-35), dateApplied: d(-30), whereApplied: "Recruiter", interviews: [{ id: "i1", date: d(-20), notes: "Recruiter screen" }, { id: "i2", date: d(-12), notes: "Hiring manager" }, { id: "i3", date: d(-4), notes: "Panel interview" }], followups: [{ id: "f3", date: d(-3), notes: "Thank-you notes sent" }] }),
+      job({ stage: "interviewing", interviewing: true, company: "Proseware Inc", position: "Product Owner III", excitement: "4", reviewPercent: "4.1", reviewCount: "720", indeedRating: "4.0", indeedReviewCount: "455", postedSalary: "$140k - $155k", salaryAsk: "$152k", location: "Hybrid", date: d(-28), dateApplied: d(-22), whereApplied: "Company site", interviews: [{ id: "i4", date: d(-9), notes: "Phone screen" }] }),
+      job({ stage: "rejected", company: "Alpine Ski House", position: "Senior Product Manager", excitement: "3", reviewPercent: "3.5", reviewCount: "198", postedSalary: "$140k - $150k", location: "On-site", date: d(-40), dateApplied: d(-34), dateRejected: d(-26), rejectionReason: "Rejected" }),
+      job({ stage: "rejected", company: "Coho Winery", position: "Product Manager", excitement: "2", reviewPercent: "3.1", reviewCount: "87", postedSalary: "$110k - $125k", location: "On-site", date: d(-45), dateApplied: d(-38), dateRejected: d(-24), rejectionReason: "Ghosted" }),
+      job({ stage: "rejected", company: "Lucerne Publishing", position: "Product Owner", excitement: "2", reviewPercent: "2.8", reviewCount: "540", postedSalary: "$120k - $135k", location: "Hybrid", date: d(-30), dateRejected: d(-22), rejectionReason: "Pass", dealbreakers: "Required 4 days on-site; compensation below range." }),
+      job({ stage: "rejected", company: "Humongous Insurance", position: "Technical Product Owner", excitement: "3", reviewPercent: "3.4", reviewCount: "4300", postedSalary: "$130k - $145k", location: "Remote", date: d(-33), dateApplied: d(-29), dateRejected: d(-15), rejectionReason: "Withdrawn", dealbreakers: "Role scope changed after first interview." })
+    ];
+    var byCo = {};
+    jobs.forEach(function (j) { byCo[j.company] = j; });
+    function contact(o) {
+      var c = Object.assign(blankContact(), o);
+      if (c.jobId === "@" + o.company) c.jobId = null;
+      return c;
+    }
+    var contacts = [
+      contact({ name: "Dana Whitfield", connection: "Recruiter", phone: "555-014-2290", email: "dana@adatum.example", linkedin: "linkedin.com/in/dana-whitfield-demo", dateOfContact: d(-30), jobId: byCo["Adatum Corporation"].id, company: "Adatum Corporation", notes: "Ran the initial screen; very responsive." }),
+      contact({ name: "Priya Raman", connection: "Hiring manager", phone: "555-014-3871", email: "priya@proseware.example", dateOfContact: d(-9), jobId: byCo["Proseware Inc"].id, company: "Proseware Inc" }),
+      contact({ name: "Oliver Hartley", connection: "Former colleague", phone: "+44 7700 900123", email: "oliver@example.com", dateOfContact: d(-14), company: "Fabrikam Robotics", notes: "Offered to refer me." })
+    ];
+    state.jobs = jobs;
+    state.contacts = contacts;
+    localSave();
+    localSaveContacts();
+  }
+
+  state.jobs = load();
+  state.contacts = loadContacts();
+  if (!state.jobs.length && !state.contacts.length) seedDemoData();
+  migrateEmbeddedContacts();
+  migrateValuesNotes();
+  state.colWidths = loadColWidths();
+
+  // ---------- Column definitions per stage ----------
+  // The Actions column is deliberately not resizable — instead it auto-sizes to
+  // whatever buttons the current tab actually needs (Jobs has one move button,
+  // Applied/Interviewing have two, Rejected/Contacts have fewer), measured off-screen
+  // rather than guessing one fixed width that's inevitably wrong for some tab.
+  var actionsWidthCache = {};
+  function measureRowActionsWidth(cacheKey, innerHtml) {
+    if (actionsWidthCache[cacheKey] !== undefined) return actionsWidthCache[cacheKey];
+    var probe = document.createElement("div");
+    probe.className = "row-actions";
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    probe.style.left = "-9999px";
+    probe.style.top = "0";
+    probe.style.width = "auto";
+    probe.innerHTML = innerHtml;
+    document.body.appendChild(probe);
+    var w = Math.ceil(probe.getBoundingClientRect().width);
+    document.body.removeChild(probe);
+    var padded = w + 8; // small safety buffer beyond the measured content
+    actionsWidthCache[cacheKey] = padded;
+    return padded;
+  }
+
+  // Moving a job between stages is now entirely field-driven (Date applied, Date
+  // rejected, the Interviewing checkbox — see applyDateAppliedAutoMove /
+  // applyDateRejectedAutoMove / applyInterviewingToggle) rather than via explicit
+  // move buttons here, since a job can move to any of 3 other stages and that was
+  // too many actions to fit per row.
+  function jobActionsInnerHtml(stage, id) {
+    return '<button class="icon-btn" data-action="view" data-id="' + id + '" title="Open record" aria-label="Open record">⤢</button>' +
+      '<button class="icon-btn danger" data-action="delete" data-id="' + id + '" title="Delete" aria-label="Delete">🗑</button>';
+  }
+
+  // Shared by the table cell and the drawer's own Excitement field — dataAttrs is
+  // whatever identifies the target (data-id + data-field for a table row, just
+  // data-field for the drawer, which always acts on the open job). Clicking a
+  // filled star that's already the current value clears the rating back to none.
+  function starButtonsHtml(value, dataAttrs) {
+    var val = parseInt(value, 10) || 0;
+    var stars = "";
+    for (var i = 1; i <= 5; i++) {
+      var filled = i <= val;
+      stars += '<button type="button" class="star-btn' + (filled ? " filled" : "") + '" ' + dataAttrs +
+        ' data-star="' + i + '" aria-label="' + i + " star" + (i > 1 ? "s" : "") + '" title="' + i + " star" + (i > 1 ? "s" : "") + '">' +
+        (filled ? "★" : "☆") + "</button>";
+    }
+    return stars;
+  }
+  function starsCellHtml(value, dataAttrs) {
+    return '<div class="stars-cell">' + starButtonsHtml(value, dataAttrs) + "</div>";
+  }
+
+  function contactActionsInnerHtml(cid) {
+    return '<button class="icon-btn" data-action="view-contact" data-cid="' + cid + '" title="Open contact" aria-label="Open contact">⤢</button>' +
+      '<button class="icon-btn danger" data-action="delete-contact" data-cid="' + cid + '" title="Delete" aria-label="Delete">🗑</button>';
+  }
+
+  // Each tab shows a different, explicit subset of columns — no shared "base" set,
+  // since e.g. Salary ask belongs on Applied/Interviewing but not Jobs, and Rejected
+  // drops most fields entirely. Column defs are individually named so each COLS_*
+  // array below just lists exactly what that tab wants, in order.
+  var COL_POSTED = { key: "date", label: "Posted", type: "date", w: "112px" };
+  var COL_POSITION = { key: "position", label: "Job position", type: "text", cls: "col-position", w: "160px" };
+  var COL_EXCITEMENT = { key: "excitement", label: "Excitement", type: "stars", w: "130px" };
+  var COL_COMPANY = { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" };
+  var COL_RATING = { key: "reviewPercent", label: "G Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
+  var COL_REVIEWS = { key: "reviewCount", label: "G Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_INDEED_RATING = { key: "indeedRating", label: "I Ratings", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
+  var COL_INDEED_REVIEWS = { key: "indeedReviewCount", label: "I Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_POSTED_SALARY = { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" };
+  var COL_SALARY_ASK = { key: "salaryAsk", label: "Salary ask", type: "text", w: "120px" };
+  var COL_LOCATION = { key: "location", label: "Location", type: "select", options: ["Remote", "Hybrid", "On-site"], selectCls: "loc-select", w: "118px" };
+  var COL_PTO = { key: "pto", label: "PTO", type: "text", w: "120px" };
+  var COL_MEDICAL = { key: "medical", label: "Medical", type: "text", w: "140px" };
+  var COL_POSTING_URL = { key: "postingUrl", label: "Job posting link", type: "url", cls: "linkedin-cell", w: "170px" };
+  var COL_DATE_APPLIED = { key: "dateApplied", label: "Applied", type: "date", w: "116px" };
+  // Not a real job field — reflects (and edits) whichever entry in job.followups[]
+  // is most recent, so the table shows one column that always tracks "the last
+  // time I followed up" rather than growing a column per follow-up the way the
+  // Interviewing tab's Interview columns do. See cellHtml's "followup-date" branch
+  // and setLastFollowupDate().
+  var COL_FOLLOWUP = { key: "followup_last", label: "Follow-up", type: "followup-date", w: "112px", sortable: false };
+  var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
+  var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
+  var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
+  var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
+
+  var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
+  // column per interview logged — built per-render in interviewCols(), then spliced
+  // in between these two halves. See buildInterviewingCols().
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP];
+  var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
+  var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
+  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
+  // Comma-grouped counts (G Reviews, I Reviews) and out-of-5 ratings (G Rating,
+  // I Ratings) share their formatting/highlight behavior across both the table and
+  // the drawer — these lists are the single source of truth for which fields get it.
+  var COMMA_FIELDS = ["reviewCount", "indeedReviewCount"];
+  // Despite the name, this list also drives the "high-rating" highlight (>4,
+  // bold + bright green) — same fields get both treatments, just at opposite ends.
+  var LOW_RATING_FIELDS = ["reviewPercent", "indeedRating"];
+
+  // One column per interview actually logged across the jobs shown on the
+  // Interviewing tab, plus always at least one (per spec, even with zero interviews
+  // logged anywhere yet). Recomputed on every render since it depends on live data.
+  function buildInterviewingCols() {
+    var maxCount = 1;
+    state.jobs.forEach(function (j) {
+      if (j.stage === "interviewing" && Array.isArray(j.interviews) && j.interviews.length > maxCount) {
+        maxCount = j.interviews.length;
+      }
+    });
+    var cols = [];
+    for (var i = 0; i < maxCount; i++) {
+      cols.push({ key: "interview_" + i, label: i === 0 ? "Interview" : "Interview " + (i + 1), type: "interview-date", w: "112px", sortable: false });
+    }
+    return cols;
+  }
+
+  function colsForStage(stage) {
+    if (stage === "jobs") return COLS_JOBS;
+    if (stage === "applied") return COLS_APPLIED;
+    if (stage === "interviewing") return COLS_INTERVIEWING_HEAD.concat(buildInterviewingCols(), COLS_INTERVIEWING_TAIL);
+    if (stage === "rejected") return COLS_REJECTED;
+    return [];
+  }
+
+  // ---------- Tabs ----------
+  var ACTIVE_TAB_KEY = "jobTrackerActiveTab.v1";
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var validStages = tabs.map(function (t) { return t.getAttribute("data-stage"); });
+
+  function selectTab(stage, opts) {
+    state.activeStage = stage;
+    tabs.forEach(function (o) { o.setAttribute("aria-selected", o.getAttribute("data-stage") === stage ? "true" : "false"); });
+    if (!opts || !opts.skipSave) {
+      try { localStorage.setItem(ACTIVE_TAB_KEY, stage); } catch (e) { /* per-device preference only */ }
+    }
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () {
+      selectTab(t.getAttribute("data-stage"));
+      state.sortKey = null;
+      renderTable();
+    });
+  });
+
+  try {
+    var savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+    if (savedTab && validStages.indexOf(savedTab) !== -1) selectTab(savedTab, { skipSave: true });
+  } catch (e) { /* default tab stands */ }
+
+  // ---------- Search (global — searches every tab, not just the active one) ----------
+  function jobMatchesQuery(job, q) {
+    return (job.company || "").toLowerCase().indexOf(q) !== -1 ||
+      (job.position || "").toLowerCase().indexOf(q) !== -1;
+  }
+  function contactMatchesQuery(contact, q) {
+    var job = contact.jobId ? findJob(contact.jobId) : null;
+    return (contact.name || "").toLowerCase().indexOf(q) !== -1 ||
+      (job && (job.company || "").toLowerCase().indexOf(q) !== -1);
+  }
+  var SEARCH_STAGE_ORDER = ["jobs", "applied", "interviewing", "rejected", "contacts"];
+  function stageHasMatch(stage, q) {
+    if (stage === "contacts") return state.contacts.some(function (c) { return contactMatchesQuery(c, q); });
+    return state.jobs.some(function (j) { return j.stage === stage && jobMatchesQuery(j, q); });
+  }
+  // Stays on the current tab if it already has a match (so typing doesn't yank you
+  // away from results you can already see); otherwise jumps to the first tab, in
+  // display order, that has one. If nothing anywhere matches, stays put and lets
+  // the current tab's own empty state explain that.
+  function pickStageForSearch(q) {
+    if (stageHasMatch(state.activeStage, q)) return state.activeStage;
+    for (var i = 0; i < SEARCH_STAGE_ORDER.length; i++) {
+      if (stageHasMatch(SEARCH_STAGE_ORDER[i], q)) return SEARCH_STAGE_ORDER[i];
+    }
+    return state.activeStage;
+  }
+
+  var searchInput = document.getElementById("search-input");
+  var searchField = document.querySelector(".search-field");
+  document.getElementById("search-clear").addEventListener("click", function () {
+    state.search = "";
+    searchInput.value = "";
+    searchField.classList.remove("has-value");
+    searchInput.focus();
+    renderTable();
+  });
+  searchInput.addEventListener("input", function () {
+    state.search = searchInput.value;
+    searchField.classList.toggle("has-value", !!state.search);
+    var q = state.search.trim().toLowerCase();
+    if (q) {
+      var targetStage = pickStageForSearch(q);
+      if (targetStage !== state.activeStage) {
+        selectTab(targetStage);
+        state.sortKey = null;
+      }
+    }
+    renderTable();
+  });
+
+  // ---------- Sortable headers ----------
+  document.getElementById("thead-row").addEventListener("click", function (e) {
+    if (e.target.closest(".col-resizer")) return;
+    var th = e.target.closest("th.sortable");
+    if (!th) return;
+    var key = th.getAttribute("data-key");
+    if (state.sortKey === key) state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+    else { state.sortKey = key; state.sortDir = "asc"; }
+    renderTable();
+  });
+  document.getElementById("thead-row").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var th = e.target.closest("th.sortable");
+    if (!th) return;
+    e.preventDefault();
+    th.click();
+  });
+
+  // ---------- Column resizing ----------
+  // Widths persist per-device (localStorage) — a layout preference, not tracker data,
+  // so it isn't part of the synced job records.
+  var MIN_COL_WIDTH = 60;
+  var resizeDrag = null; // { key, col, startX, startWidth }
+
+  document.getElementById("thead-row").addEventListener("mousedown", function (e) {
+    var handle = e.target.closest(".col-resizer");
+    if (!handle) return;
+    e.preventDefault();
+    var key = handle.getAttribute("data-key");
+    var col = document.querySelector('#colgroup col[data-key="' + key + '"]');
+    if (!col) return;
+    var table = document.getElementById("table");
+    // Contacts tab columns share some names with job columns (e.g. "company") — store
+    // their widths under a separate namespace so resizing one tab never touches the other.
+    var storageKey = state.activeStage === "contacts" ? "contact_" + key : key;
+    resizeDrag = {
+      key: storageKey,
+      col: col,
+      table: table,
+      startX: e.clientX,
+      startWidth: handle.closest("th").getBoundingClientRect().width,
+      startTableWidth: table.getBoundingClientRect().width
+    };
+    handle.classList.add("dragging");
+    document.body.classList.add("col-resizing");
+  });
+
+  document.addEventListener("mousemove", function (e) {
+    if (!resizeDrag) return;
+    var delta = e.clientX - resizeDrag.startX;
+    var next = Math.max(MIN_COL_WIDTH, Math.round(resizeDrag.startWidth + delta));
+    var appliedDelta = next - resizeDrag.startWidth;
+    resizeDrag.col.style.width = next + "px";
+    // Chromium (and others) won't re-run the fixed-table-layout algorithm from a
+    // <colgroup> width change alone — nudging the table's own width in lockstep is
+    // what actually forces the column to visibly resize.
+    resizeDrag.table.style.width = (resizeDrag.startTableWidth + appliedDelta) + "px";
+  });
+
+  document.addEventListener("mouseup", function () {
+    if (!resizeDrag) return;
+    var finalWidth = parseInt(resizeDrag.col.style.width, 10);
+    state.colWidths[resizeDrag.key] = finalWidth;
+    saveColWidths();
+    document.querySelectorAll(".col-resizer.dragging").forEach(function (el) { el.classList.remove("dragging"); });
+    document.body.classList.remove("col-resizing");
+    resizeDrag = null;
+  });
+
+  // A job created here isn't persisted yet — it only exists in memory until the
+  // viewer actually edits something (a field, or adds a contact). Closing the
+  // drawer untouched discards it instead of leaving an empty record behind; see
+  // pendingNewJob / closeDrawer().
+  var pendingNewJob = null;
+
+  document.getElementById("add-btn").addEventListener("click", function () {
+    var job = blankJob();
+    job.stage = state.activeStage;
+    if (state.activeStage === "interviewing") job.interviewing = true;
+    if (state.activeStage === "rejected" && !job.dateRejected) job.dateRejected = todayStr();
+    state.jobs.push(job);
+    pendingNewJob = { id: job.id, snapshot: JSON.stringify(job) };
+    renderTable();
+    openDrawer(job.id);
+  });
+
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function fmt(v) { return v === undefined || v === null ? "" : v; }
+
+  // Reviews count is stored as a plain digit string (so sorting/parseFloat keep working)
+  // and only comma-grouped for display — stripCommas recovers the raw digits for editing.
+  function formatWithCommas(v) {
+    var digits = String(v === undefined || v === null ? "" : v).replace(/[^0-9]/g, "");
+    return digits === "" ? "" : Number(digits).toLocaleString("en-US");
+  }
+  function stripCommas(v) {
+    return String(v === undefined || v === null ? "" : v).replace(/[^0-9]/g, "");
+  }
+
+  // Table date cells show just month/day at rest (year is still stored and still
+  // settable via the picker — see the tbody focus/focusout handlers that swap these
+  // between a plain text display and a real date input).
+  function formatDateShort(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+    return m ? m[2] + "/" + m[3] : "";
+  }
+
+  // Live-formats a phone number as it's typed. A number starting with "+" is treated
+  // as international (e.g. UK: "+44 7700 900123") — the country code and the spacing
+  // are kept as typed rather than forced into the domestic grouping below, which would
+  // otherwise strip the "+44" and mis-group the remaining digits. Anything else is
+  // formatted ###-###-#### from whatever digits are present (pasted, typed, with or
+  // without punctuation), same as before.
+  function formatPhoneNumber(v) {
+    var raw = String(v || "");
+    var leading = /^\s*/.exec(raw)[0];
+    var rest = raw.slice(leading.length);
+    if (rest.charAt(0) === "+") {
+      var body = rest.slice(1).replace(/[^\d\s]/g, "").replace(/ {2,}/g, " ").replace(/^\s+/, "");
+      return "+" + body;
+    }
+    var digits = rest.replace(/\D/g, "").slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return digits.slice(0, 3) + "-" + digits.slice(3);
+    return digits.slice(0, 3) + "-" + digits.slice(3, 6) + "-" + digits.slice(6);
+  }
+
+  // Sets interviews[idx].date, creating that entry (and padding any earlier missing
+  // ones with blanks so indices stay meaningful) if it doesn't exist yet — lets the
+  // Interviewing tab's "Interview"/"Interview N" columns double as a quick way to log
+  // a date without opening the drawer.
+  function setInterviewDate(job, idx, value) {
+    if (!Array.isArray(job.interviews)) job.interviews = [];
+    while (job.interviews.length <= idx) job.interviews.push({ id: uid(), date: "", notes: "" });
+    job.interviews[idx].date = value;
+  }
+
+  function lastFollowup(job) {
+    var entries = Array.isArray(job.followups) ? job.followups : [];
+    return entries.length ? entries[entries.length - 1] : null;
+  }
+  // Edits the most recent follow-up's date if one exists; otherwise creates the
+  // first entry (same "click to fill it in" behavior as the Interview column).
+  function setLastFollowupDate(job, value) {
+    if (!Array.isArray(job.followups)) job.followups = [];
+    if (job.followups.length === 0) job.followups.push({ id: uid(), date: value, notes: "" });
+    else job.followups[job.followups.length - 1].date = value;
+  }
+
+  // Browser spellcheck/autofill suggestions popping up over a spreadsheet-style grid of
+  // same-shaped inputs is a known way to steal focus mid-keystroke — e.g. typing a "-"
+  // or a word into a field the browser doesn't recognize as a real form field. Every
+  // inline table cell opts out.
+  var NO_ASSIST_ATTRS = ' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"';
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ---------- Table rendering ----------
+  // The Rejected stat splits into two by rejection reason rather than one bucket
+  // for the whole stage: "Rejected" covers an actual rejection or a ghosting,
+  // "Pass" covers turning it down yourself (Pass) or backing out (Withdrawn).
+  var REJECTED_STAT_REASONS = ["Rejected", "Ghosted"];
+  var PASS_STAT_REASONS = ["Pass", "Withdrawn"];
+
+  function renderStats() {
+    var jobs = state.jobs.filter(function (j) { return j.stage === "jobs"; }).length;
+    var applied = state.jobs.filter(function (j) { return j.stage === "applied"; }).length;
+    var interviewing = state.jobs.filter(function (j) { return j.stage === "interviewing"; }).length;
+    var rejected = state.jobs.filter(function (j) { return j.stage === "rejected"; }).length;
+    // The "Applied" stat counts jobs that actually have a Date applied filled in —
+    // not just anything sitting in Applied/Interviewing/Rejected, since a job can
+    // reach Rejected (or be created there directly) without ever having been applied
+    // to, e.g. a cold rejection or a "Pass" you decided on before applying.
+    var appliedTotal = state.jobs.filter(function (j) { return !!j.dateApplied; }).length;
+    var rejectedCount = state.jobs.filter(function (j) { return j.stage === "rejected" && REJECTED_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
+    var passCount = state.jobs.filter(function (j) { return j.stage === "rejected" && PASS_STAT_REASONS.indexOf(j.rejectionReason) !== -1; }).length;
+    document.getElementById("stats").innerHTML = [
+      ["Applied", appliedTotal],
+      ["Interviewing", interviewing],
+      ["Rejected", rejectedCount],
+      ["Pass", passCount]
+    ].map(function (s) {
+      return '<div class="stat"><span class="n">' + s[1] + '</span><span class="l">' + s[0] + '</span></div>';
+    }).join("");
+    // While a search is active, each tab's count badge shows how many results
+    // are actually waiting there instead of its usual total — so a match sitting
+    // in a tab you're not on doesn't go unnoticed (see the conversation that
+    // prompted this: a company split across Applied and Rejected as two records).
+    var searching = !!state.search.trim();
+    var q = searching ? state.search.trim().toLowerCase() : "";
+    function setCount(id, stage, total) {
+      var el = document.getElementById(id);
+      var matchCount = stage === "contacts"
+        ? getAllContacts().filter(function (c) { return contactMatchesQuery(c, q); }).length
+        : state.jobs.filter(function (j) { return j.stage === stage && jobMatchesQuery(j, q); }).length;
+      el.textContent = searching ? matchCount : total;
+      el.classList.toggle("match-count", searching && matchCount > 0);
+    }
+    setCount("count-jobs", "jobs", jobs);
+    setCount("count-applied", "applied", applied);
+    setCount("count-interviewing", "interviewing", interviewing);
+    setCount("count-rejected", "rejected", rejected);
+    setCount("count-contacts", "contacts", getAllContacts().length);
+  }
+
+  function cellHtml(job, col) {
+    var v = fmt(job[col.key]);
+    if (col.type === "checkbox") {
+      return '<div class="chk-cell"><input type="checkbox" data-id="' + job.id + '" data-field="' + col.key + '" ' + (job[col.key] ? "checked" : "") + '></div>';
+    }
+    if (col.type === "stars") {
+      return starsCellHtml(v, 'data-id="' + job.id + '" data-field="' + col.key + '"');
+    }
+    if (col.type === "select") {
+      var opts = col.options.map(function (o) {
+        return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + escapeHtml(o || "—") + "</option>";
+      }).join("");
+      return '<select class="' + (col.selectCls || "") + '" data-id="' + job.id + '" data-field="' + col.key + '">' + opts + "</select>";
+    }
+    if (col.type === "url") {
+      var urlEsc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      var urlOpen = v
+        ? '<a href="' + escapeHtml(normalizeUrl(v)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open" aria-label="Open link">↗</a>'
+        : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
+      return '<div class="linkedin-inner">' + urlOpen + '<input type="text" value="' + urlEsc + '" placeholder="https://" data-id="' + job.id +
+        '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + "></div>";
+    }
+    if (col.type === "interview-date") {
+      var idx = parseInt(col.key.split("_")[1], 10);
+      var entry = Array.isArray(job.interviews) ? job.interviews[idx] : null;
+      var dateEsc = formatDateShort(entry ? entry.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<input type="text" value="' + dateEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
+    }
+    if (col.type === "followup-date") {
+      var fu = lastFollowup(job);
+      var fuEsc = formatDateShort(fu ? fu.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<input type="text" value="' + fuEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
+    }
+    // Date columns render as plain text at rest (year hidden — see formatDateShort)
+    // and swap to a real date input, picker included, the moment they're focused;
+    // see the tbody focus/focusout handlers.
+    var type = col.commaFormat ? "text" : (col.type === "date" ? "text" : (col.type === "number" ? "number" : "text"));
+    var esc = String(col.commaFormat ? formatWithCommas(v) : (col.type === "date" ? formatDateShort(v) : v)).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    var extra = col.commaFormat ? ' inputmode="numeric"' : (col.type === "number" ? ' inputmode="decimal"' : "");
+    if (col.type === "date") extra += ' placeholder="—"';
+    if (col.min !== undefined) extra += ' min="' + col.min + '"';
+    if (col.max !== undefined) extra += ' max="' + col.max + '"';
+    if (col.step !== undefined) extra += ' step="' + col.step + '"';
+    var ratingCls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? " low-rating" :
+      (LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isHighRating(v) ? " high-rating" : "");
+    var cls = ratingCls ? ' class="' + ratingCls.trim() + '"' : "";
+    return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
+      '"' + cls + extra + NO_ASSIST_ATTRS + '>';
+  }
+
+  function isLowRating(v) {
+    var n = parseFloat(v);
+    return v !== "" && !isNaN(n) && n < 3;
+  }
+
+  function isHighRating(v) {
+    var n = parseFloat(v);
+    return v !== "" && !isNaN(n) && n > 4;
+  }
+
+  function compareJobs(a, b, col, dir) {
+    var av = a[col.key], bv = b[col.key];
+    var cmp;
+    if (col.type === "number") {
+      var an = av === "" || av === null || av === undefined || isNaN(av) ? null : parseFloat(av);
+      var bn = bv === "" || bv === null || bv === undefined || isNaN(bv) ? null : parseFloat(bv);
+      if (an === null && bn === null) cmp = 0;
+      else if (an === null) cmp = 1;
+      else if (bn === null) cmp = -1;
+      else cmp = an - bn;
+    } else if (col.type === "checkbox") {
+      cmp = (bv ? 1 : 0) - (av ? 1 : 0);
+    } else {
+      var as = (av || "").toString().toLowerCase();
+      var bs = (bv || "").toString().toLowerCase();
+      if (as === "" && bs === "") cmp = 0;
+      else if (as === "") cmp = 1;
+      else if (bs === "") cmp = -1;
+      else cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    }
+    return dir === "desc" ? -cmp : cmp;
+  }
+
+  function renderTable() {
+    renderStats();
+    var stage = state.activeStage;
+
+    document.getElementById("add-row").style.display = stage === "contacts" ? "none" : "flex";
+    document.getElementById("contacts-add-row").style.display = stage === "contacts" ? "flex" : "none";
+
+    if (stage === "contacts") { renderContactsTab(); return; }
+
+    var cols = colsForStage(stage);
+    var rows = state.jobs.filter(function (j) { return j.stage === stage; });
+
+    var searching = !!state.search.trim();
+    if (searching) {
+      var q = state.search.trim().toLowerCase();
+      rows = rows.filter(function (j) { return jobMatchesQuery(j, q); });
+    }
+
+    var sortCol = state.sortKey ? cols.filter(function (c) { return c.key === state.sortKey; })[0] : null;
+    if (sortCol) {
+      rows = rows.slice().sort(function (a, b) { return compareJobs(a, b, sortCol, state.sortDir); });
+    }
+
+    // <colgroup> drives the actual column widths under table-layout:fixed — it's the
+    // mechanism browsers reliably re-layout when a width changes after initial render;
+    // relying on <th> cell widths alone left drag-resize updating the inline style
+    // without ever visibly reflowing the columns.
+    var actionsW = measureRowActionsWidth("job_" + stage, jobActionsInnerHtml(stage, "x"));
+    var colgroup = document.getElementById("colgroup");
+    var totalW = actionsW;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + cols.map(function (c) {
+      var w = state.colWidths[c.key] || parseInt(c.w, 10);
+      totalW += w;
+      return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
+    }).join("");
+    // Table needs an explicit width matching the columns (see the resize handler for why) —
+    // min-width still lets it look reasonable on wide screens with just a few columns.
+    document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
+
+    var thead = document.getElementById("thead-row");
+    // Fixed, not resizable — it always needs to fit its buttons exactly (the longest
+    // combination across stages is "← Applied" + "Rejected →" plus the two icon buttons).
+    thead.innerHTML = '<th class="actions-col">Actions</th>' + cols.map(function (c) {
+      var sortable = c.sortable !== false;
+      var active = sortable && sortCol && sortCol.key === c.key;
+      var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      return '<th class="' + (sortable ? "sortable" : "") + (active ? " active" : "") + '" data-key="' + c.key +
+        '" tabindex="0">' + c.label + (sortable ? '<span class="arrow">' + arrow + "</span>" : "") +
+        '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
+    }).join("");
+
+    var hintEl = document.getElementById("sort-hint");
+    hintEl.textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
+
+    var tbody = document.getElementById("tbody");
+    if (rows.length === 0) {
+      var heading = searching ? "Nothing matches “" + escapeHtml(state.search.trim()) + "”" : "No records in " + STAGE_LABEL[stage] + " yet";
+      var body = searching ? "Try a different spelling, or clear the search to see everything in " + STAGE_LABEL[stage] + "." :
+        (stage === "jobs" ? "Add a role you're considering to start tracking it." : "Move a record here from another tab, or add one directly.");
+      tbody.innerHTML = '<tr><td colspan="' + (cols.length + 1) + '"><div class="empty">' +
+        "<h2>" + heading + "</h2>" +
+        "<p>" + body + "</p>" +
+        (searching ? "" : '<button class="btn btn-primary" type="button" onclick="document.getElementById(\'add-btn\').click()">+ Add job</button>') +
+        "</div></td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (job) {
+      var cells = cols.map(function (c) {
+        return '<td class="' + (c.cls || "") + '">' + cellHtml(job, c) + "</td>";
+      }).join("");
+
+      return '<tr data-id="' + job.id + '">' +
+        '<td class="actions-col"><div class="row-actions">' + jobActionsInnerHtml(stage, job.id) + "</div></td>" + cells + "</tr>";
+    }).join("");
+  }
+
+  // ---------- Contacts tab ----------
+  // Flattens every contact across every job into one sortable/searchable sheet, with
+  // Company/LinkedIn as clickable links instead of editable cells (editing still happens
+  // in the owning job's drawer, or this contact's own drawer).
+  var CONTACT_COLS = [
+    { key: "name", label: "Name", type: "text", w: "150px" },
+    { key: "connection", label: "Connection", type: "text", w: "130px" },
+    { key: "phone", label: "Phone number", type: "tel", w: "140px" },
+    { key: "email", label: "Email address", type: "email", w: "190px" },
+    { key: "company", label: "Company", type: "link", w: "160px" },
+    { key: "dateOfContact", label: "Date of contact", type: "date", w: "130px" },
+    { key: "linkedin", label: "LinkedIn", type: "url", w: "170px" }
+  ];
+
+  function normalizeUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    return /^https?:\/\//i.test(u) ? u : "https://" + u;
+  }
+
+  // Wires an <input> up to a companion <a class="icon-btn"> "open" link, keeping the
+  // link's href (and enabled/disabled look) in sync as the field is typed into.
+  // Returns a sync() you can call after setting el.value programmatically (e.g. when a
+  // drawer opens), since that doesn't fire its own "input" event.
+  var urlFieldSyncs = {};
+  function wireUrlField(inputId, linkId) {
+    var input = document.getElementById(inputId);
+    var link = document.getElementById(linkId);
+    function sync() {
+      var v = input.value.trim();
+      if (v) { link.href = normalizeUrl(v); link.classList.remove("disabled"); }
+      else { link.removeAttribute("href"); link.classList.add("disabled"); }
+    }
+    input.addEventListener("input", sync);
+    sync();
+    urlFieldSyncs[inputId] = sync;
+  }
+
+  function getAllContacts() { return state.contacts; }
+
+  function compareContacts(a, b, key, dir) {
+    var av, bv;
+    if (key === "company") {
+      var aJob = a.jobId ? findJob(a.jobId) : null;
+      var bJob = b.jobId ? findJob(b.jobId) : null;
+      av = aJob ? (aJob.company || "") : "";
+      bv = bJob ? (bJob.company || "") : "";
+    } else {
+      av = a[key] || ""; bv = b[key] || "";
+    }
+    var as = av.toString().toLowerCase(), bs = bv.toString().toLowerCase();
+    var cmp;
+    if (as === "" && bs === "") cmp = 0;
+    else if (as === "") cmp = 1;
+    else if (bs === "") cmp = -1;
+    else cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    return dir === "desc" ? -cmp : cmp;
+  }
+
+  function renderContactsTab() {
+    var entries = state.contacts;
+
+    var searching = !!state.search.trim();
+    if (searching) {
+      var q = state.search.trim().toLowerCase();
+      entries = entries.filter(function (c) { return contactMatchesQuery(c, q); });
+    }
+
+    var sortCol = state.sortKey ? CONTACT_COLS.filter(function (c) { return c.key === state.sortKey; })[0] : null;
+    if (sortCol) {
+      entries = entries.slice().sort(function (a, b) { return compareContacts(a, b, sortCol.key, state.sortDir); });
+    }
+
+    var actionsW = measureRowActionsWidth("contacts", contactActionsInnerHtml("x"));
+    var colgroup = document.getElementById("colgroup");
+    var totalW = actionsW;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + CONTACT_COLS.map(function (c) {
+      var w = state.colWidths["contact_" + c.key] || parseInt(c.w, 10);
+      totalW += w;
+      return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
+    }).join("");
+    document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
+
+    var thead = document.getElementById("thead-row");
+    thead.innerHTML = '<th class="actions-col">Actions</th>' + CONTACT_COLS.map(function (c) {
+      var active = sortCol && sortCol.key === c.key;
+      var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key + '" tabindex="0">' +
+        c.label + '<span class="arrow">' + arrow + "</span>" +
+        '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
+    }).join("");
+
+    var hintEl = document.getElementById("sort-hint");
+    hintEl.textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
+
+    var tbody = document.getElementById("tbody");
+    if (entries.length === 0) {
+      var heading = searching ? "No contacts match “" + escapeHtml(state.search.trim()) + "”" : "No contacts yet";
+      var body = searching ? "Try a different spelling, or clear the search." :
+        "Click \"+ Add contact\" below, or add one from any job's detail view.";
+      tbody.innerHTML = '<tr><td colspan="' + (CONTACT_COLS.length + 1) + '"><div class="empty"><h2>' + heading + "</h2><p>" + body + "</p></div></td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = entries.map(function (c) {
+      var job = c.jobId ? findJob(c.jobId) : null;
+      if (syncContactCompany(c)) saveContact(c, false);
+      var esc = function (v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); };
+      // Linked to a job: Company is a read-only jump link (syncContactCompany keeps it
+      // matching the job's own name). Not linked — including standalone contacts, and
+      // ones whose job got deleted — it's a plain editable field instead, so there's
+      // always a way to type a company name in, not just display one from elsewhere.
+      var companyCell = job
+        ? '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.company || job.position || "Untitled job") + "</button>"
+        : '<input type="text" value="' + esc(c.company) + '" placeholder="Company name" data-cid="' + c.id + '" data-cfield="company"' + NO_ASSIST_ATTRS + '>';
+      var linkedinOpen = c.linkedin
+        ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
+        : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
+      return '<tr data-cid="' + c.id + '">' +
+        '<td class="actions-col"><div class="row-actions">' + contactActionsInnerHtml(c.id) + "</div></td>" +
+        '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td class="' + (job ? "cell-text" : "") + '">' + companyCell + "</td>" +
+        '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
+        '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var openJobBtn = e.target.closest('button[data-action="open-job"]');
+    if (openJobBtn) { openDrawer(openJobBtn.getAttribute("data-job-id")); return; }
+    var viewContactBtn = e.target.closest('button[data-action="view-contact"]');
+    if (viewContactBtn) { openContactDrawer(viewContactBtn.getAttribute("data-cid")); return; }
+    var delContactBtn = e.target.closest('button[data-action="delete-contact"]');
+    if (delContactBtn) { deleteContactFromTable(delContactBtn.getAttribute("data-cid")); return; }
+  });
+
+  document.getElementById("tbody").addEventListener("dblclick", function (e) {
+    if (state.activeStage !== "contacts" || e.target.closest(".actions-col")) return;
+    var row = e.target.closest("tr[data-cid]");
+    if (row) openContactDrawer(row.getAttribute("data-cid"));
+  });
+
+  // Mirrors the drawer-close flush: the moment a cell stops being edited, send its
+  // pending write immediately rather than leaving it debounced — isEditingInline()'s
+  // protection lifts the instant focus leaves, so any write still queued past that point
+  // is exposed to being overwritten by a sync delivery that hasn't seen it yet.
+  document.getElementById("tbody").addEventListener("focusout", function (e) {
+    flushPendingWrites();
+    flushPendingContactWrites();
+    var field = e.target.getAttribute && e.target.getAttribute("data-field");
+    if (field && COMMA_FIELDS.indexOf(field) !== -1) {
+      e.target.value = formatWithCommas(e.target.value);
+    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field) || field === "followup_last")) {
+      // Back to a plain text cell showing just month/day — the full value (year
+      // included) is still whatever was just picked, it's just not displayed here.
+      e.target.type = "text";
+      e.target.value = formatDateShort(e.target.value);
+    }
+  });
+
+  // Reviews shows comma-grouped ("12,432") at rest but is edited as plain digits —
+  // swap to the raw value the moment the cell is focused. Date columns similarly
+  // show just month/day at rest (see formatDateShort) and become a real date input
+  // — picker included — the moment they're focused, so the year is still fully
+  // enterable, just not shown once you click away.
+  document.getElementById("tbody").addEventListener("focus", function (e) {
+    var field = e.target.getAttribute && e.target.getAttribute("data-field");
+    var interviewMatch = field && /^interview_(\d+)$/.exec(field);
+    if (field && COMMA_FIELDS.indexOf(field) !== -1) {
+      e.target.value = stripCommas(e.target.value);
+    } else if (field && DATE_COL_KEYS.indexOf(field) !== -1) {
+      var id = e.target.getAttribute("data-id");
+      var job = findJob(id);
+      e.target.type = "date";
+      e.target.value = (job && job[field]) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    } else if (interviewMatch) {
+      var id2 = e.target.getAttribute("data-id");
+      var job2 = findJob(id2);
+      var entry = job2 && Array.isArray(job2.interviews) ? job2.interviews[parseInt(interviewMatch[1], 10)] : null;
+      e.target.type = "date";
+      e.target.value = (entry && entry.date) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    } else if (field === "followup_last") {
+      var id3 = e.target.getAttribute("data-id");
+      var job3 = findJob(id3);
+      var fu = job3 ? lastFollowup(job3) : null;
+      e.target.type = "date";
+      e.target.value = (fu && fu.date) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    }
+  }, true);
+
+  document.getElementById("tbody").addEventListener("input", function (e) {
+    var el = e.target;
+    var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
+    if (!cid || !field) return;
+    var c = findContact(cid);
+    if (!c) return;
+    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    c[field] = el.value;
+    saveContact(c, false);
+    if (field === "linkedin") {
+      var openLink = el.closest("td").querySelector("a.icon-btn");
+      if (openLink) {
+        if (el.value) { openLink.style.opacity = ""; openLink.style.pointerEvents = ""; openLink.href = normalizeUrl(el.value); }
+        else { openLink.style.opacity = "0.35"; openLink.style.pointerEvents = "none"; }
+      }
+    }
+  });
+
+  async function deleteContactFromTable(cid) {
+    if (!(await askConfirm("Delete this contact? This can't be undone.", "Delete"))) return;
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
+    renderTable();
+  }
+
+  document.getElementById("add-contact-standalone").addEventListener("click", function () {
+    var c = blankContact();
+    state.contacts.push(c);
+    saveContact(c, true);
+    renderTable();
+    openContactDrawer(c.id);
+  });
+
+  function findJob(id) {
+    for (var i = 0; i < state.jobs.length; i++) if (state.jobs[i].id === id) return state.jobs[i];
+    return null;
+  }
+
+  // Checking "Interviewing" while a row is in Applied moves it to the Interviewing tab;
+  // unchecking it while in Interviewing moves it back to Applied. Shared by the main
+  // sheet and the drawer.
+  // Checking "Interviewing" moves the record to the Interviewing tab from wherever it
+  // currently is (Jobs, Applied, or Rejected); unchecking it moves it back to Applied.
+  function applyInterviewingToggle(job, checked) {
+    job.interviewing = checked;
+    var moved = false;
+    if (checked && job.stage !== "interviewing") {
+      job.stage = "interviewing";
+      if (!job.dateApplied) job.dateApplied = todayStr();
+      moved = true;
+    } else if (!checked && job.stage === "interviewing") {
+      job.stage = "applied";
+      moved = true;
+    }
+    return moved;
+  }
+
+  // Filling in "Date applied" moves the record to Applied from any stage except
+  // Interviewing (further along — entering a date there shouldn't demote it back);
+  // clearing it while in Applied moves it back to Jobs. Mirrors applyDateRejectedAutoMove
+  // below, which already worked "from any stage" — this one originally only moved out
+  // of Jobs specifically, which meant a job stuck in Rejected (e.g. from a past sync bug
+  // leaving stage="rejected" with no rejection date) had no way back out via this field.
+  //
+  // One deliberate asymmetry: a job that's Rejected AND still has a Date rejected stays
+  // put even if Date applied gets filled in (or was already set, e.g. on open — the vast
+  // majority of rejections have both dates, applied-then-rejected). Date rejected still
+  // being set means the rejection itself hasn't been undone; only clearing THAT field
+  // (applyDateRejectedAutoMove's own move-back below) should pull it out of Rejected.
+  // Without this, simply opening any normal already-rejected record — or filling in Date
+  // applied without meaning to also un-reject it — would silently move it to Applied.
+  function applyDateAppliedAutoMove(job) {
+    if (job.dateApplied && job.stage !== "applied" && job.stage !== "interviewing") {
+      if (job.stage === "rejected" && job.dateRejected) return false;
+      job.stage = "applied";
+      return true;
+    }
+    if (!job.dateApplied && job.stage === "applied") {
+      job.stage = "jobs";
+      return true;
+    }
+    return false;
+  }
+
+  // Filling in "Date rejected" from any tab moves the record to Rejected; clearing
+  // it while in Rejected moves it back to Applied. Same field-driven-move pattern
+  // as Date Applied above.
+  function applyDateRejectedAutoMove(job) {
+    if (job.dateRejected && job.stage !== "rejected") {
+      job.stage = "rejected";
+      return true;
+    }
+    if (!job.dateRejected && job.stage === "rejected") {
+      job.stage = "applied";
+      return true;
+    }
+    return false;
+  }
+
+  // Delegated input/change handling for inline editing (avoids full re-render per keystroke)
+  document.getElementById("tbody").addEventListener("input", function (e) {
+    var el = e.target;
+    var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
+    if (!id || !field) return;
+    var job = findJob(id);
+    if (!job) return;
+    var interviewMatch = /^interview_(\d+)$/.exec(field);
+    if (interviewMatch) {
+      setInterviewDate(job, parseInt(interviewMatch[1], 10), el.value);
+      save(job);
+      return;
+    }
+    if (field === "followup_last") {
+      setLastFollowupDate(job, el.value);
+      save(job);
+      return;
+    }
+    if (el.type === "checkbox") job[field] = el.checked;
+    else if (COMMA_FIELDS.indexOf(field) !== -1) { el.value = stripCommas(el.value); job[field] = el.value; }
+    else job[field] = el.value;
+    if (LOW_RATING_FIELDS.indexOf(field) !== -1) {
+      el.classList.toggle("low-rating", isLowRating(el.value));
+      el.classList.toggle("high-rating", isHighRating(el.value));
+    }
+    if (field === "postingUrl") {
+      var openLink = el.closest("td").querySelector("a.icon-btn");
+      if (openLink) {
+        if (el.value) { openLink.style.opacity = ""; openLink.style.pointerEvents = ""; openLink.href = normalizeUrl(el.value); }
+        else { openLink.style.opacity = "0.35"; openLink.style.pointerEvents = "none"; }
+      }
+    }
+    save(job);
+  });
+
+  document.getElementById("tbody").addEventListener("change", function (e) {
+    var el = e.target;
+    var id = el.getAttribute("data-id"), field = el.getAttribute("data-field");
+    var job = id ? findJob(id) : null;
+    if (job && el.tagName === "SELECT") {
+      job[field] = el.value;
+      save(job);
+    } else if (job && field === "dateApplied") {
+      var movedDate = applyDateAppliedAutoMove(job);
+      save(job, true);
+      if (movedDate) { renderTable(); return; }
+    } else if (job && /^interview_\d+$/.test(field)) {
+      // Re-render in case this just logged an interview past the current column
+      // count — buildInterviewingCols() needs to pick up the new max and add a column.
+      save(job, true);
+      renderTable();
+      return;
+    }
+    renderStats();
+  });
+
+  document.getElementById("tbody").addEventListener("click", async function (e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var job = findJob(id);
+    if (!job) return;
+    var action = btn.getAttribute("data-action");
+    if (action === "view") { openDrawer(id); return; }
+    if (action === "delete") {
+      if (await askConfirm("Delete this record? This can't be undone.")) {
+        state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
+        localSave();
+        deleteFromDb(id);
+        renderTable();
+      }
+    }
+  });
+
+  // Clicking a star sets Excitement to that count; clicking the already-selected
+  // star clears it back to none. Swaps just this cell's markup rather than a full
+  // renderTable() so repeated clicks across rows don't reset scroll/focus.
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var starBtn = e.target.closest(".star-btn[data-id]");
+    if (!starBtn) return;
+    var id = starBtn.getAttribute("data-id"), field = starBtn.getAttribute("data-field");
+    var job = findJob(id);
+    if (!job) return;
+    var clicked = parseInt(starBtn.getAttribute("data-star"), 10);
+    var current = parseInt(job[field], 10) || 0;
+    job[field] = clicked === current ? "" : String(clicked);
+    save(job, true);
+    var cell = starBtn.closest(".stars-cell");
+    if (cell) cell.outerHTML = starsCellHtml(job[field], 'data-id="' + id + '" data-field="' + field + '"');
+  });
+
+  // Double-click anywhere in a row (except the Actions cell, which has its own buttons)
+  // opens the full record, same as the ⤢ button.
+  document.getElementById("tbody").addEventListener("dblclick", function (e) {
+    if (e.target.closest(".actions-col")) return;
+    var row = e.target.closest("tr[data-id]");
+    if (!row) return;
+    openDrawer(row.getAttribute("data-id"));
+  });
+
+  // ---------- Drawer ----------
+  var drawer = document.getElementById("drawer");
+  var scrim = document.getElementById("scrim");
+
+  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
+    "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied",
+    "dateRejected", "rejectionReason", "dealbreakers"];
+
+  function updateStageBadge(job) {
+    var badge = document.getElementById("d-stage-badge");
+    badge.textContent = STAGE_LABEL[job.stage];
+    badge.className = "stage-badge stage-" + job.stage;
+  }
+
+  // "Dealbreakers" only makes sense when you were the one who turned it down —
+  // a Pass (never applied further) or a Withdrawn (pulled out after applying) —
+  // so it stays hidden the rest of the time instead of cluttering every rejected
+  // record.
+  function updateDealbreakersVisibility(job) {
+    var wrap = document.getElementById("dealbreakers-field");
+    if (wrap) wrap.style.display = (job.rejectionReason === "Pass" || job.rejectionReason === "Withdrawn") ? "" : "none";
+  }
+
+  function openDrawer(id) {
+    var job = findJob(id);
+    if (!job) return;
+    state.activeId = id;
+
+    // Self-heal on open: a record can have a stage that no longer matches its own
+    // dates — most commonly a leftover from the stale-sync bug where a job ended up
+    // stage="rejected" with no rejection date ever set. Re-running both auto-moves
+    // here corrects that the moment the record is viewed, without needing to clear
+    // and retype a date that's already correct, just not yet reflected in the stage.
+    var healed = applyDateAppliedAutoMove(job) || applyDateRejectedAutoMove(job);
+    if (healed) save(job, true);
+
+    document.getElementById("d-position").value = job.position || "";
+    document.getElementById("d-company").value = job.company || "";
+    SIMPLE_FIELDS.forEach(function (f) {
+      var el = document.getElementById("d-" + f);
+      if (el) el.value = COMMA_FIELDS.indexOf(f) !== -1 ? formatWithCommas(job[f]) : (job[f] || "");
+    });
+    document.getElementById("d-interviewing").checked = !!job.interviewing;
+    LOW_RATING_FIELDS.forEach(function (f) {
+      var el = document.getElementById("d-" + f);
+      if (el) {
+        el.classList.toggle("low-rating", isLowRating(job[f]));
+        el.classList.toggle("high-rating", isHighRating(job[f]));
+      }
+    });
+    document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
+    updateDealbreakersVisibility(job);
+    urlFieldSyncs["d-companyUrl"]();
+    urlFieldSyncs["d-postingUrl"]();
+    urlFieldSyncs["d-linkedinPosting"]();
+
+    updateStageBadge(job);
+
+    renderContacts(job);
+    renderEntries(job, "interviews", "interviews-list");
+    renderEntries(job, "followups", "followups-list");
+
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+    scrim.classList.add("open");
+    document.getElementById("d-position").focus();
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+    scrim.classList.remove("open");
+    flushPendingWrites();
+    if (pendingNewJob && pendingNewJob.id === state.activeId) {
+      var newJob = findJob(pendingNewJob.id);
+      if (newJob) {
+        var untouched = JSON.stringify(newJob) === pendingNewJob.snapshot && !contactsForJob(newJob.id).length;
+        if (untouched) {
+          state.jobs = state.jobs.filter(function (j) { return j.id !== newJob.id; });
+          localSave();
+        } else {
+          save(newJob, true);
+        }
+      }
+      pendingNewJob = null;
+    }
+    state.activeId = null;
+    renderTable();
+  }
+
+  document.getElementById("d-close").addEventListener("click", closeDrawer);
+  scrim.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+  });
+
+  // ---------- Contact detail drawer (Contacts tab) ----------
+  // Contacts are top-level now (state.contacts), same as jobs — a contact may or may
+  // not have a jobId linking it to a job record.
+  var cdScrim = document.getElementById("cd-scrim");
+  var cdDrawer = document.getElementById("cd-drawer");
+  var cdCompanyLink = document.getElementById("cd-company-link");
+  var cdCompanyInput = document.getElementById("cd-company");
+  var CD_FIELDS = ["phone", "email", "linkedin", "dateOfContact"];
+  var cdActiveId = null;
+
+  function findContact(cid) {
+    return state.contacts.find(function (c) { return c.id === cid; }) || null;
+  }
+
+  function openContactDrawer(cid) {
+    var c = findContact(cid);
+    if (!c) return;
+    cdActiveId = cid;
+    document.getElementById("cd-name").value = c.name || "";
+    document.getElementById("cd-connection").value = c.connection || "";
+    CD_FIELDS.forEach(function (f) {
+      document.getElementById("cd-" + f).value = c[f] || "";
+    });
+    document.getElementById("cd-notes").value = c.notes || "";
+    urlFieldSyncs["cd-linkedin"]();
+    var job = c.jobId ? findJob(c.jobId) : null;
+    if (syncContactCompany(c)) saveContact(c, false);
+    // Linked to a job: Company is a read-only jump link. Not linked (including a
+    // standalone contact, or one whose linked job got deleted) — it's a plain
+    // editable field instead, so there's always a way to type a company name in.
+    if (job) {
+      cdCompanyInput.style.display = "none";
+      cdCompanyLink.style.display = "";
+      cdCompanyLink.textContent = (job.company || job.position || "Untitled job") + " — open job record ↗";
+      cdCompanyLink.style.cursor = "pointer";
+      cdCompanyLink.style.color = "var(--accent)";
+    } else {
+      cdCompanyLink.style.display = "none";
+      cdCompanyInput.style.display = "";
+      cdCompanyInput.value = c.company || "";
+    }
+    cdDrawer.classList.add("open");
+    cdDrawer.setAttribute("aria-hidden", "false");
+    cdScrim.classList.add("open");
+    document.getElementById("cd-name").focus();
+  }
+
+  function closeContactDrawer() {
+    cdDrawer.classList.remove("open");
+    cdDrawer.setAttribute("aria-hidden", "true");
+    cdScrim.classList.remove("open");
+    flushPendingContactWrites();
+    cdActiveId = null;
+    renderTable();
+  }
+
+  document.getElementById("cd-close").addEventListener("click", closeContactDrawer);
+  cdScrim.addEventListener("click", closeContactDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && cdDrawer.classList.contains("open")) closeContactDrawer();
+  });
+
+  cdCompanyLink.addEventListener("click", function () {
+    var c = findContact(cdActiveId);
+    if (!c || !c.jobId) return;
+    var jobId = c.jobId;
+    closeContactDrawer();
+    openDrawer(jobId);
+  });
+
+  function saveActiveContactField(field, value) {
+    var c = findContact(cdActiveId);
+    if (!c) return;
+    c[field] = value;
+    saveContact(c, false);
+  }
+
+  document.getElementById("cd-name").addEventListener("input", function (e) { saveActiveContactField("name", e.target.value); });
+  document.getElementById("cd-connection").addEventListener("input", function (e) { saveActiveContactField("connection", e.target.value); });
+  document.getElementById("cd-notes").addEventListener("input", function (e) { saveActiveContactField("notes", e.target.value); });
+  cdCompanyInput.addEventListener("input", function (e) { saveActiveContactField("company", e.target.value); });
+  CD_FIELDS.forEach(function (f) {
+    document.getElementById("cd-" + f).addEventListener("input", function (e) {
+      if (f === "phone") e.target.value = formatPhoneNumber(e.target.value);
+      saveActiveContactField(f, e.target.value);
+    });
+  });
+
+  document.getElementById("cd-delete").addEventListener("click", async function () {
+    if (!cdActiveId) return;
+    if (!(await askConfirm("Delete this contact? This can't be undone.", "Delete"))) return;
+    var cid = cdActiveId;
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
+    closeContactDrawer();
+  });
+
+  // ---------- Vet this job with Claude ----------
+  // Opens a new Claude chat and gets the vetting prompt onto the clipboard. claude.ai
+  // doesn't reliably accept a prefilled message via URL, and clipboard writes can be
+  // silently blocked inside an embedded page (same lessons as the bookmarklet above),
+  // so the modal always shows the text pre-selected as a guaranteed manual-copy fallback.
+  var vetScrim = document.getElementById("vet-scrim");
+  var vetModal = document.getElementById("vet-modal");
+  var vetTextarea = document.getElementById("vet-textarea");
+
+  function buildVetPrompt(job) {
+    var lines = ["Vet this job:", ""];
+    var headline = job.position || "Untitled role";
+    if (job.company) headline += " at " + job.company;
+    lines.push(headline);
+    if (job.location) lines.push("Location: " + job.location);
+    if (job.postedSalary) lines.push("Posted salary: " + job.postedSalary);
+    if (job.postingUrl) lines.push("Posting link: " + job.postingUrl);
+    lines.push("");
+    if (job.description) {
+      lines.push("Job description:");
+      lines.push(job.description);
+    } else {
+      lines.push("(No job description saved yet.)");
+    }
+    return lines.join("\n");
+  }
+
+  function closeVetModal() {
+    vetScrim.classList.remove("open");
+    vetModal.classList.remove("open");
+    vetModal.setAttribute("aria-hidden", "true");
+  }
+
+  document.getElementById("vet-btn").addEventListener("click", async function () {
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var prompt = buildVetPrompt(job);
+
+    window.open("https://claude.ai/new", "_blank");
+
+    vetTextarea.value = prompt;
+    vetScrim.classList.add("open");
+    vetModal.classList.add("open");
+    vetModal.setAttribute("aria-hidden", "false");
+    vetTextarea.focus();
+    vetTextarea.select();
+
+    var hint = document.getElementById("vet-modal-hint");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(prompt);
+        hint.textContent = "A new Claude chat just opened, and this has been copied — paste it in there (Cmd/Ctrl+V).";
+      } else {
+        hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
+      }
+    } catch (e) {
+      hint.textContent = "A new Claude chat just opened. This is already selected — press Cmd/Ctrl+C, then paste it in there (Cmd/Ctrl+V).";
+    }
+  });
+
+  document.getElementById("vet-copy").addEventListener("click", async function () {
+    vetTextarea.focus();
+    vetTextarea.select();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(vetTextarea.value);
+    } catch (e) { /* selection above still lets Cmd/Ctrl+C work */ }
+  });
+  document.getElementById("vet-close").addEventListener("click", closeVetModal);
+  vetScrim.addEventListener("click", closeVetModal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && vetModal.classList.contains("open")) closeVetModal();
+  });
+
+  // ---------- Confirm dialog ----------
+  // A custom modal standing in for window.confirm(), which returns false without
+  // showing anything inside this sandboxed artifact frame — the same class of issue
+  // that blocked clipboard-read and window.open query params earlier in this build.
+  var confirmScrim = document.getElementById("confirm-scrim");
+  var confirmModalEl = document.getElementById("confirm-modal");
+  var confirmMessageEl = document.getElementById("confirm-message");
+  var confirmOkBtn = document.getElementById("confirm-ok");
+  var confirmResolve = null;
+
+  function askConfirm(message, okLabel) {
+    confirmMessageEl.textContent = message;
+    confirmOkBtn.textContent = okLabel || "Delete";
+    confirmScrim.classList.add("open");
+    confirmModalEl.classList.add("open");
+    confirmModalEl.setAttribute("aria-hidden", "false");
+    confirmOkBtn.focus();
+    return new Promise(function (resolve) { confirmResolve = resolve; });
+  }
+  function closeConfirm(result) {
+    confirmScrim.classList.remove("open");
+    confirmModalEl.classList.remove("open");
+    confirmModalEl.setAttribute("aria-hidden", "true");
+    if (confirmResolve) { var r = confirmResolve; confirmResolve = null; r(result); }
+  }
+  document.getElementById("confirm-cancel").addEventListener("click", function () { closeConfirm(false); });
+  confirmOkBtn.addEventListener("click", function () { closeConfirm(true); });
+  confirmScrim.addEventListener("click", function () { closeConfirm(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && confirmModalEl.classList.contains("open")) closeConfirm(false);
+  });
+
+  document.getElementById("d-delete").addEventListener("click", async function () {
+    if (!state.activeId) return;
+    if (await askConfirm("Delete this record? This can't be undone.")) {
+      var id = state.activeId;
+      state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
+      localSave();
+      deleteFromDb(id);
+      closeDrawer();
+    }
+  });
+
+  document.getElementById("drawer").addEventListener("click", function (e) {
+    var starBtn = e.target.closest(".star-btn");
+    if (!starBtn || !state.activeId) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var clicked = parseInt(starBtn.getAttribute("data-star"), 10);
+    var current = parseInt(job.excitement, 10) || 0;
+    job.excitement = clicked === current ? "" : String(clicked);
+    save(job, true);
+    document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
+  });
+
+  document.getElementById("drawer").addEventListener("input", function (e) {
+    var el = e.target;
+    if (!state.activeId) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    if (el.id === "d-position") { job.position = el.value; save(job); return; }
+    if (el.id === "d-company") { job.company = el.value; save(job); return; }
+    if (el.id === "d-interviewing") {
+      var moved = applyInterviewingToggle(job, el.checked);
+      updateStageBadge(job);
+      save(job, true);
+      if (moved) renderTable();
+      return;
+    }
+    var m = el.id.match(/^d-(.+)$/);
+    if (m && SIMPLE_FIELDS.indexOf(m[1]) !== -1) {
+      if (COMMA_FIELDS.indexOf(m[1]) !== -1) el.value = stripCommas(el.value);
+      job[m[1]] = el.value;
+      if (LOW_RATING_FIELDS.indexOf(m[1]) !== -1) {
+        el.classList.toggle("low-rating", isLowRating(el.value));
+        el.classList.toggle("high-rating", isHighRating(el.value));
+      }
+      save(job);
+    }
+  });
+  document.getElementById("drawer").addEventListener("focus", function (e) {
+    if (COMMA_FIELDS.indexOf(e.target.id.replace(/^d-/, "")) !== -1) e.target.value = stripCommas(e.target.value);
+  }, true);
+  document.getElementById("drawer").addEventListener("blur", function (e) {
+    var job = state.activeId && findJob(state.activeId);
+    if (job && (e.target.id === "d-position" || e.target.id === "d-company")) save(job, true);
+    if (COMMA_FIELDS.indexOf(e.target.id.replace(/^d-/, "")) !== -1) e.target.value = formatWithCommas(e.target.value);
+  }, true);
+  document.getElementById("drawer").addEventListener("change", function (e) {
+    var job = state.activeId && findJob(state.activeId);
+    if (!job) return;
+    if (e.target.id === "d-dateApplied") {
+      var moved = applyDateAppliedAutoMove(job);
+      updateStageBadge(job);
+      save(job, true);
+      if (moved) renderTable();
+      return;
+    }
+    if (e.target.id === "d-dateRejected") {
+      var movedR = applyDateRejectedAutoMove(job);
+      updateStageBadge(job);
+      save(job, true);
+      if (movedR) renderTable();
+      return;
+    }
+    if (e.target.id === "d-rejectionReason") {
+      updateDealbreakersVisibility(job);
+      save(job, true);
+      return;
+    }
+    if ((e.target.id === "d-location" || e.target.tagName === "INPUT") && e.target.id !== "d-interviewing") {
+      save(job, true);
+    }
+  });
+
+  // ---------- Contacts ----------
+  function contactsForJob(jobId) {
+    return state.contacts.filter(function (c) { return c.jobId === jobId; });
+  }
+
+  function renderContacts(job) {
+    var list = document.getElementById("contacts-list");
+    var jobContacts = contactsForJob(job.id);
+    if (!jobContacts.length) {
+      list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
+    } else {
+      list.innerHTML = jobContacts.map(function (c) {
+        return '<div class="card" data-cid="' + c.id + '">' +
+          '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
+          '<div class="card-grid">' +
+          field2("Name", "text", c.name, c.id, "name") +
+          field2("Connection", "text", c.connection, c.id, "connection") +
+          field2("Phone", "tel", c.phone, c.id, "phone") +
+          field2("Email", "email", c.email, c.id, "email") +
+          field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
+          field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
+          '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
+          String(c.notes || "").replace(/</g, "&lt;") + '</textarea></div>' +
+          "</div></div>";
+      }).join("");
+    }
+  }
+
+  function field2(label, type, val, cid, field) {
+    var esc = String(val || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    return '<div class="field"><label>' + label + '</label><input type="' + type + '" value="' + esc +
+      '" data-cid="' + cid + '" data-cfield="' + field + '"></div>';
+  }
+
+  document.getElementById("add-contact").addEventListener("click", function () {
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var c = blankContact();
+    c.jobId = job.id;
+    c.company = job.company || "";
+    state.contacts.push(c);
+    saveContact(c, true);
+    renderContacts(job);
+    // The new card can land below the fold in a long drawer — bring it into view so
+    // adding one doesn't look like nothing happened.
+    var newCard = document.querySelector("#contacts-list .card:last-child");
+    if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  document.getElementById("contacts-list").addEventListener("input", function (e) {
+    var el = e.target;
+    var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
+    if (!cid || !field) return;
+    var c = findContact(cid);
+    if (!c) return;
+    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    c[field] = el.value;
+    saveContact(c, false);
+  });
+
+  document.getElementById("contacts-list").addEventListener("click", async function (e) {
+    var btn = e.target.closest('button[data-action="rm-contact"]');
+    if (!btn) return;
+    if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
+    var job = findJob(state.activeId);
+    if (!job) return;
+    var cid = btn.getAttribute("data-cid");
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
+    renderContacts(job);
+  });
+
+  // ---------- Interviews & follow-ups (shared logic) ----------
+  function renderEntries(job, key, listId) {
+    if (!Array.isArray(job[key])) job[key] = [];
+    var list = document.getElementById(listId);
+    var entries = job[key];
+    if (!entries.length) {
+      list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">None logged yet.</p>';
+      return;
+    }
+    list.innerHTML = entries.map(function (e, idx) {
+      var notesEsc = String(e.notes || "").replace(/</g, "&lt;");
+      return '<div class="card entry-card" data-eid="' + e.id + '">' +
+        '<button class="icon-btn rm" data-action="rm-entry" data-key="' + key + '" data-eid="' + e.id + '" aria-label="Remove entry">✕</button>' +
+        '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">' +
+        (key === "interviews" ? "Interview " : "Follow-up ") + (idx + 1) + "</label>" +
+        '<input type="date" value="' + (e.date || "") + '" data-key="' + key + '" data-eid="' + e.id + '" data-efield="date"></div>' +
+        '<textarea placeholder="Notes" data-key="' + key + '" data-eid="' + e.id + '" data-efield="notes">' + notesEsc + "</textarea>" +
+        "</div>";
+    }).join("");
+  }
+
+  // Surfaces an unexpected failure right under the list instead of failing silently
+  // (this is what let the "old jobs can't add an interview" bug hide from us).
+  function showEntryError(addBtnId, err) {
+    var btn = document.getElementById(addBtnId);
+    if (!btn) return;
+    var msg = document.getElementById(addBtnId + "-error");
+    if (!msg) {
+      msg = document.createElement("p");
+      msg.id = addBtnId + "-error";
+      msg.style.cssText = "margin:6px 0 0; font-size:0.78rem; color:var(--danger);";
+      btn.insertAdjacentElement("afterend", msg);
+    }
+    msg.textContent = "Couldn't save that — " + (err && err.message ? err.message : String(err));
+  }
+
+  function bindEntrySection(key, listId, addBtnId) {
+    document.getElementById(addBtnId).addEventListener("click", function () {
+      try {
+        var job = findJob(state.activeId);
+        if (!job) return;
+        if (!Array.isArray(job[key])) job[key] = [];
+        job[key].push({ id: uid(), date: "", notes: "" });
+        save(job, true);
+        renderEntries(job, key, listId);
+        var newCard = document.querySelector("#" + listId + " .card:last-child");
+        if (newCard) newCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (err) { showEntryError(addBtnId, err); }
+    });
+    var list = document.getElementById(listId);
+    list.addEventListener("input", function (e) {
+      try {
+        var el = e.target;
+        var eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
+        if (!eid || !field) return;
+        var job = findJob(state.activeId);
+        if (!job) return;
+        if (!Array.isArray(job[key])) job[key] = [];
+        var entry = job[key].find(function (x) { return x.id === eid; });
+        if (entry) { entry[field] = el.value; save(job); }
+      } catch (err) { showEntryError(addBtnId, err); }
+    });
+    list.addEventListener("click", async function (e) {
+      var btn = e.target.closest('button[data-action="rm-entry"]');
+      if (!btn) return;
+      var noun = key === "interviews" ? "interview" : "follow-up";
+      if (!(await askConfirm("Remove this " + noun + "? This can't be undone.", "Remove"))) return;
+      var job = findJob(state.activeId);
+      if (!job) return;
+      job[key] = job[key].filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
+      save(job, true);
+      renderEntries(job, key, listId);
+    });
+  }
+
+  bindEntrySection("interviews", "interviews-list", "add-interview");
+  bindEntrySection("followups", "followups-list", "add-followup");
+
+  // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
+  window.addEventListener("storage", function (e) {
+    if (isSyncSensitive()) return;
+    if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
+    else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
+  });
+
+  // A cell left mid-edit with nothing ever blurring it (e.g. the viewer switched tabs
+  // instead of clicking away) would otherwise leave isEditingInline() blocking every
+  // sync update indefinitely, even after the tab comes back. Blur it on the way out.
+  //
+  // NOTE: this used to also do a one-shot re-fetch on returning to the tab, as a defense
+  // against the realtime listener silently dying while backgrounded. Removed — a get()
+  // read can lag behind very recent writes from this same session, and wholesale-replacing
+  // state.jobs from that lagging snapshot was deleting jobs added just before switching
+  // away (they were still safe on the server; a refresh's own fresh fetch just happened to
+  // land after the lag caught up, so they'd reappear). The stale in-flight-write timeout
+  // below is a safe fix for the original stuck-forever symptom; this one wasn't.
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) return;
+    var active = document.activeElement;
+    if (active && active.closest && active.closest("#tbody")) active.blur();
+  });
+
+  wireUrlField("d-companyUrl", "d-companyUrl-open");
+  wireUrlField("d-postingUrl", "d-postingUrl-open");
+  wireUrlField("d-linkedinPosting", "d-linkedinPosting-open");
+  wireUrlField("cd-linkedin", "cd-linkedin-open");
+
+  // Pressing Enter in any field commits it (blurs, so the value saves and the field is
+  // free to pick up external updates again) instead of leaving the viewer wondering
+  // whether it "took." Textareas are excluded so Enter still inserts a newline there.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var el = e.target;
+    if (el.tagName === "INPUT" && el.type !== "checkbox" && el.type !== "radio") {
+      e.preventDefault();
+      el.blur();
+    }
+  });
+
+  renderTable();
+  initExport();
+  initCloudSync().then(handleBookmarkletAdd);
+})();
+</script>
+
+</body></html>
