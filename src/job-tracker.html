@@ -976,6 +976,7 @@
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
+        <div class="field"><label for="d-followUpDue" title="Set automatically to 7 days after your latest applied date, follow-up or interview — change it by hand any time; it resets when new activity is logged.">Follow-up due</label><input type="date" id="d-followUpDue"></div>
       </div>
     </div>
 
@@ -1200,11 +1201,60 @@
     return JSON.parse(JSON.stringify(j));
   }
 
+  // ---------- "Follow-up due" (auto-scheduled next follow-up) ----------
+  // Due = 7 days after the most recent activity on an applied/interviewing job: the latest
+  // of its Date applied, any logged follow-up, and any logged interview. It's recomputed
+  // from inside save() — i.e. whenever any of that activity changes, from any path (drawer,
+  // table cell, entry removed) — and overwrites the field each time, as requested. The
+  // activity date it was last computed from is stored alongside (followUpBasis) so a
+  // manual edit of Due sticks until the next real activity change, and so merely opening
+  // or re-saving a record never re-derives it.
+  function addDaysIso(iso, n) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    if (!m) return "";
+    var t = new Date(+m[1], +m[2] - 1, +m[3] + n);
+    return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+  }
+  function syncFollowUpDue(job) {
+    if (job.stage !== "applied" && job.stage !== "interviewing") return false;
+    var dates = [];
+    function take(d) { if (/^\d{4}-\d{2}-\d{2}$/.test(d || "")) dates.push(d); }
+    take(job.dateApplied);
+    (Array.isArray(job.followups) ? job.followups : []).forEach(function (e) { take(e && e.date); });
+    (Array.isArray(job.interviews) ? job.interviews : []).forEach(function (e) { take(e && e.date); });
+    if (!dates.length) return false;
+    dates.sort();
+    var basis = dates[dates.length - 1];
+    if (job.followUpBasis === basis) return false;
+    job.followUpBasis = basis;
+    job.followUpDue = addDaysIso(basis, 7);
+    return true;
+  }
+  // The table cell / open drawer field may already be on screen when save() recomputes.
+  function refreshDueDisplays(job) {
+    var cell = document.querySelector('#tbody input[data-field="followUpDue"][data-id="' + job.id + '"]');
+    if (cell && cell !== document.activeElement) cell.value = formatDateShort(job.followUpDue);
+    if (state.activeId === job.id) {
+      var d = document.getElementById("d-followUpDue");
+      if (d && d !== document.activeElement) d.value = job.followUpDue || "";
+    }
+  }
+  // One pass over existing records so jobs applied to before this field existed get a
+  // Due date too. Idempotent: only touches a job whose activity date has no basis yet.
+  function backfillFollowUpDue() {
+    var touched = state.jobs.filter(function (j) { return syncFollowUpDue(j); });
+    if (!touched.length) return;
+    localSave();
+    touched.forEach(function (j) { save(j, true); });
+    if (!state.activeId && !isEditingInline()) renderTable();
+  }
+
   function save(job, immediate) {
     // Bumped on every save, local-only or not — this is what lets mergeJobsFromSnapshot
     // tell a just-edited local job apart from a stale/lagging snapshot of the same job
     // that doesn't reflect the edit yet (see that function for why that distinction matters).
     job.updatedAt = Date.now();
+    if (syncFollowUpDue(job)) refreshDueDisplays(job);
     localSave();
     if (!jobsCol || !job) return;
     var id = job.id;
@@ -1293,6 +1343,7 @@
   async function initCloudSync() {
     if (!window.claude || typeof window.claude.use !== "function") {
       setSyncStatus("off", "Saved on this device only");
+      backfillFollowUpDue();
       return;
     }
     try {
@@ -1302,6 +1353,7 @@
     }
     if (!dbApi) {
       setSyncStatus("off", "Saved on this device only");
+      backfillFollowUpDue();
       return;
     }
     jobsCol = dbApi.collection("jobs");
@@ -1334,6 +1386,7 @@
     } catch (e) { /* keep whatever loaded from localStorage */ }
     migrateEmbeddedContacts();
     migrateValuesNotes();
+    backfillFollowUpDue();
 
     jobsCol.orderBy("createdAt").onSnapshot(function (snap) {
       if (isSyncSensitive()) return; // don't clobber an in-progress (or not-yet-confirmed) edit
@@ -1341,6 +1394,7 @@
       localSave();
       migrateEmbeddedContacts();
       migrateValuesNotes();
+      backfillFollowUpDue();
       renderTable();
     }, function () {
       setSyncStatus("off", "Sync paused — changes are saved on this device");
@@ -1583,7 +1637,7 @@
       date: "", position: "", company: "", excitement: "",
       reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
-      dateApplied: "", whereApplied: "", interviewing: false,
+      dateApplied: "", whereApplied: "", interviewing: false, followUpDue: "", followUpBasis: "",
       dateRejected: "", rejectionReason: "", dealbreakers: "",
       companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
       contacts: [], interviews: [], followups: []
@@ -1824,21 +1878,24 @@
   // Interviewing tab's Interview columns do. See cellHtml's "followup-date" branch
   // and setLastFollowupDate().
   var COL_FOLLOWUP = { key: "followup_last", label: "Follow-up", type: "followup-date", w: "112px", sortable: false };
+  // Next follow-up to do: auto-set to 7 days after the latest activity (see syncFollowUpDue),
+  // still editable by hand. A plain date field, unlike Follow-up above which reflects the log.
+  var COL_FOLLOWUP_DUE = { key: "followUpDue", label: "Due", type: "date", w: "100px" };
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
   var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
-  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP];
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE];
   var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
-  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected"];
+  var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected", "followUpDue"];
   // Comma-grouped counts (G Reviews, I Reviews) and out-of-5 ratings (G Rating,
   // I Ratings) share their formatting/highlight behavior across both the table and
   // the drawer — these lists are the single source of truth for which fields get it.
@@ -2723,7 +2780,7 @@
   var scrim = document.getElementById("scrim");
 
   var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
-    "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied",
+    "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied", "followUpDue",
     "dateRejected", "rejectionReason", "dealbreakers"];
 
   function updateStageBadge(job) {
