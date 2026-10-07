@@ -25,6 +25,7 @@
     --rating-high: #1a9d4b;
     --due-warn: #c2570c;
     --due-late: #c62828;
+    --due-stale: #7a7f87;
     --focus: #2b6e63;
     --shadow: 0 12px 32px -12px rgba(27, 36, 48, 0.28);
     --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.08);
@@ -55,6 +56,7 @@
       --rating-high: #3ddc73;
       --due-warn: #ff9f43;
       --due-late: #ff5c5c;
+      --due-stale: #9aa0a8;
       --focus: #5aab9b;
       --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -83,6 +85,7 @@
     --rating-high: #3ddc73;
     --due-warn: #ff9f43;
     --due-late: #ff5c5c;
+    --due-stale: #9aa0a8;
     --focus: #5aab9b;
     --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -447,6 +450,8 @@
 
   input.due-warn, .field input.due-warn { color: var(--due-warn); font-weight: 600; }
   input.due-late, .field input.due-late { color: var(--due-late); font-weight: 700; }
+  input.due-stale, .field input.due-stale { color: var(--due-stale); font-weight: 400; font-style: italic; }
+  .due-hint { margin-top: 4px; font-size: 12px; color: var(--due-stale); }
 
   input.high-rating, .field input.high-rating {
     color: var(--rating-high);
@@ -985,7 +990,7 @@
         <div class="field"><label for="d-dateApplied">Date applied</label><input type="date" id="d-dateApplied"></div>
         <div class="field"><label for="d-whereApplied">Where applied</label><input type="text" id="d-whereApplied" placeholder="e.g. LinkedIn, company site, referral"></div>
         <div class="field span-2 checkline"><input type="checkbox" id="d-interviewing"><label for="d-interviewing">Interviewing</label></div>
-        <div class="field"><label for="d-followUpDue" title="Set automatically to 7 days after your latest applied date, follow-up or interview — change it by hand any time; it resets when new activity is logged.">Follow-up due</label><input type="date" id="d-followUpDue"></div>
+        <div class="field"><label for="d-followUpDue" title="Set automatically to 7 days after your latest applied date, follow-up or interview — change it by hand any time; it resets when new activity is logged.">Follow-up due</label><input type="date" id="d-followUpDue"><div class="due-hint" id="d-followUpDue-hint" hidden>Consider closing — 30+ days since you applied.</div></div>
       </div>
     </div>
 
@@ -1224,8 +1229,8 @@
     var t = new Date(+m[1], +m[2] - 1, +m[3] + n);
     return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
   }
-  // Colors the Due date by how far past it is: 9+ days overdue -> orange, 14+ -> red and
-  // bold. Computed against today's local date, so it's refreshed whenever the tab is
+  // Colors the Due date by how far past it is: 2+ days overdue -> orange, 7+ -> red and
+  // bold, 23+ -> grey ("consider closing"). Computed against today's local date, so it's refreshed whenever the tab is
   // brought back to the front as well as on every render/edit.
   function daysOverdue(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
@@ -1237,12 +1242,24 @@
   function dueClass(iso) {
     var n = daysOverdue(iso);
     if (n === null) return "";
-    return n >= 14 ? "due-late" : (n >= 9 ? "due-warn" : "");
+    // Due is applied + 7, so these track days since applying: 2-6 overdue = 9-13 days,
+    // 7+ = 14+ days, 23+ = 30+ days. 0-1 days overdue (or still in the future) is normal.
+    if (n >= 23) return "due-stale";
+    if (n >= 7) return "due-late";
+    if (n >= 2) return "due-warn";
+    return "";
   }
+  var DUE_STALE_HINT = "Consider closing — 30+ days since you applied.";
   function applyDueClass(el, iso) {
     var c = dueClass(iso);
     el.classList.toggle("due-late", c === "due-late");
     el.classList.toggle("due-warn", c === "due-warn");
+    el.classList.toggle("due-stale", c === "due-stale");
+    if (el.id === "d-followUpDue") {
+      var hint = document.getElementById("d-followUpDue-hint");
+      if (hint) hint.hidden = c !== "due-stale";
+    } else if (c === "due-stale") el.title = DUE_STALE_HINT;
+    else el.removeAttribute("title");
   }
 
   function syncFollowUpDue(job) {
@@ -1285,6 +1302,51 @@
     if (!state.activeId && !isEditingInline()) renderTable();
   }
 
+  // ---------- merge-on-write ----------
+  // A tab that's been open a while holds an old copy of a record. save() used to .set() that
+  // whole copy, so any field another tab/device had filled in since (and this tab still had
+  // blank) got overwritten with blanks. Now every write first re-reads the cloud copy and
+  // merges field by field: a field wins for THIS tab only if this tab actually changed it
+  // relative to `syncedBase` — the last version this tab saw from (or wrote to) the cloud.
+  // Everything else takes the cloud's current value. With no base on record, a blank local
+  // value never replaces a non-blank cloud one. Intentionally clearing a field still works
+  // (local differs from base, so local wins).
+  var syncedBase = {};          // "j:<id>" / "c:<id>" -> last-synced clone of the record
+  var writeSeq = {};            // same keys -> bumps on every save, so a superseded write backs off
+  function sameValue(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
+  function isBlankValue(v) { return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length); }
+  function mergeForWrite(local, remote, base) {
+    var out = {};
+    var keys = {};
+    Object.keys(local).forEach(function (k) { keys[k] = 1; });
+    Object.keys(remote).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      var lv = local[k], rv = remote[k];
+      if (k === "id") { out[k] = local.id; return; }
+      if (k === "updatedAt") { out[k] = Math.max(lv || 0, rv || 0); return; }
+      if (rv === undefined) { out[k] = lv; return; }
+      if (lv === undefined) { out[k] = rv; return; }
+      var useLocal;
+      if (base) useLocal = !sameValue(lv, base[k]);
+      else useLocal = !(isBlankValue(lv) && !isBlankValue(rv));
+      out[k] = useLocal ? lv : rv;
+    });
+    return out;
+  }
+  // Writes `body` to col/id through mergeForWrite; resolves the merged record that was
+  // written, or null if a newer save for the same record took over while we were reading.
+  function mergedSet(col, id, key, body, seq) {
+    return col.doc(id).get().then(function (snap) { return snap && snap.exists ? snap.data() : null; }, function () { return null; })
+      .then(function (remote) {
+        if (writeSeq[key] !== seq) return null;
+        var merged = remote ? mergeForWrite(body, JSON.parse(JSON.stringify(remote)), syncedBase[key]) : body;
+        return col.doc(id).set(merged).then(function () {
+          syncedBase[key] = JSON.parse(JSON.stringify(merged));
+          return merged;
+        });
+      });
+  }
+
   function save(job, immediate) {
     // Bumped on every save, local-only or not — this is what lets mergeJobsFromSnapshot
     // tell a just-edited local job apart from a stale/lagging snapshot of the same job
@@ -1296,13 +1358,15 @@
     var id = job.id;
     if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
     var body = cloneJob(job);
+    var key = "j:" + id;
+    var seq = writeSeq[key] = (writeSeq[key] || 0) + 1;
     var doWrite = function () {
       delete writeTimers[id];
       delete pendingWrites[id];
-      inFlightWrites[id] = Date.now();
-      jobsCol.doc(id).set(body)
+      var stamp = inFlightWrites[id] = Date.now();
+      mergedSet(jobsCol, id, key, body, seq)
         .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
-        .finally(function () { delete inFlightWrites[id]; });
+        .finally(function () { if (inFlightWrites[id] === stamp) delete inFlightWrites[id]; });
     };
     if (immediate) { doWrite(); }
     else { pendingWrites[id] = doWrite; writeTimers[id] = setTimeout(doWrite, 500); }
@@ -1362,7 +1426,11 @@
   function mergeJobsFromSnapshot(remoteJobs) {
     var byId = {};
     state.jobs.forEach(function (j) { byId[j.id] = j; });
-    remoteJobs.forEach(function (rj) { byId[rj.id] = newerRecord(rj, byId[rj.id]); });
+    remoteJobs.forEach(function (rj) {
+      var chosen = newerRecord(rj, byId[rj.id]);
+      if (chosen === rj) syncedBase["j:" + rj.id] = JSON.parse(JSON.stringify(rj));
+      byId[rj.id] = chosen;
+    });
     var merged = Object.keys(byId).map(function (id) { return byId[id]; });
     merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     state.jobs = merged;
@@ -1370,7 +1438,11 @@
   function mergeContactsFromSnapshot(remoteContacts) {
     var byId = {};
     state.contacts.forEach(function (c) { byId[c.id] = c; });
-    remoteContacts.forEach(function (rc) { byId[rc.id] = newerRecord(rc, byId[rc.id]); });
+    remoteContacts.forEach(function (rc) {
+      var chosen = newerRecord(rc, byId[rc.id]);
+      if (chosen === rc) syncedBase["c:" + rc.id] = JSON.parse(JSON.stringify(rc));
+      byId[rc.id] = chosen;
+    });
     var merged = Object.keys(byId).map(function (id) { return byId[id]; });
     merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     state.contacts = merged;
@@ -1735,13 +1807,15 @@
     var id = contact.id;
     if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
     var body = JSON.parse(JSON.stringify(contact));
+    var key = "c:" + id;
+    var seq = writeSeq[key] = (writeSeq[key] || 0) + 1;
     var doWrite = function () {
       delete contactWriteTimers[id];
       delete pendingContactWrites[id];
-      inFlightContactWrites[id] = Date.now();
-      contactsCol.doc(id).set(body)
+      var stamp = inFlightContactWrites[id] = Date.now();
+      mergedSet(contactsCol, id, key, body, seq)
         .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
-        .finally(function () { delete inFlightContactWrites[id]; });
+        .finally(function () { if (inFlightContactWrites[id] === stamp) delete inFlightContactWrites[id]; });
     };
     if (immediate) { doWrite(); }
     else { pendingContactWrites[id] = doWrite; contactWriteTimers[id] = setTimeout(doWrite, 500); }
@@ -2346,6 +2420,7 @@
     var ratingCls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? " low-rating" :
       (LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isHighRating(v) ? " high-rating" : "");
     if (col.key === "followUpDue" && dueClass(v)) ratingCls = " " + dueClass(v);
+    if (col.key === "followUpDue" && dueClass(v) === "due-stale") extra += ' title="' + DUE_STALE_HINT + '"';
     var cls = ratingCls ? ' class="' + ratingCls.trim() + '"' : "";
     return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
       '"' + cls + extra + NO_ASSIST_ATTRS + '>';
