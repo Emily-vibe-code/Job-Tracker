@@ -23,6 +23,8 @@
     --danger-soft: #f6dfdd;
     --success: #2f7a52;
     --rating-high: #1a9d4b;
+    --due-warn: #c2570c;
+    --due-late: #c62828;
     --focus: #2b6e63;
     --shadow: 0 12px 32px -12px rgba(27, 36, 48, 0.28);
     --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.08);
@@ -51,6 +53,8 @@
       --danger-soft: #3c2422;
       --success: #6fbb8e;
       --rating-high: #3ddc73;
+      --due-warn: #ff9f43;
+      --due-late: #ff5c5c;
       --focus: #5aab9b;
       --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -77,6 +81,8 @@
     --danger-soft: #3c2422;
     --success: #6fbb8e;
     --rating-high: #3ddc73;
+    --due-warn: #ff9f43;
+    --due-late: #ff5c5c;
     --focus: #5aab9b;
     --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -438,6 +444,9 @@
     color: var(--danger);
     font-weight: 600;
   }
+
+  input.due-warn, .field input.due-warn { color: var(--due-warn); font-weight: 600; }
+  input.due-late, .field input.due-late { color: var(--due-late); font-weight: 700; }
 
   input.high-rating, .field input.high-rating {
     color: var(--rating-high);
@@ -1215,6 +1224,27 @@
     var t = new Date(+m[1], +m[2] - 1, +m[3] + n);
     return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
   }
+  // Colors the Due date by how far past it is: 9+ days overdue -> orange, 14+ -> red and
+  // bold. Computed against today's local date, so it's refreshed whenever the tab is
+  // brought back to the front as well as on every render/edit.
+  function daysOverdue(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    if (!m) return null;
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((today - new Date(+m[1], +m[2] - 1, +m[3])) / 86400000);
+  }
+  function dueClass(iso) {
+    var n = daysOverdue(iso);
+    if (n === null) return "";
+    return n >= 14 ? "due-late" : (n >= 9 ? "due-warn" : "");
+  }
+  function applyDueClass(el, iso) {
+    var c = dueClass(iso);
+    el.classList.toggle("due-late", c === "due-late");
+    el.classList.toggle("due-warn", c === "due-warn");
+  }
+
   function syncFollowUpDue(job) {
     if (job.stage !== "applied" && job.stage !== "interviewing") return false;
     var dates = [];
@@ -1233,10 +1263,16 @@
   // The table cell / open drawer field may already be on screen when save() recomputes.
   function refreshDueDisplays(job) {
     var cell = document.querySelector('#tbody input[data-field="followUpDue"][data-id="' + job.id + '"]');
-    if (cell && cell !== document.activeElement) cell.value = formatDateShort(job.followUpDue);
+    if (cell) {
+      if (cell !== document.activeElement) cell.value = formatDateShort(job.followUpDue);
+      applyDueClass(cell, job.followUpDue);
+    }
     if (state.activeId === job.id) {
       var d = document.getElementById("d-followUpDue");
-      if (d && d !== document.activeElement) d.value = job.followUpDue || "";
+      if (d) {
+        if (d !== document.activeElement) d.value = job.followUpDue || "";
+        applyDueClass(d, job.followUpDue);
+      }
     }
   }
   // One pass over existing records so jobs applied to before this field existed get a
@@ -2309,6 +2345,7 @@
     if (col.step !== undefined) extra += ' step="' + col.step + '"';
     var ratingCls = LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isLowRating(v) ? " low-rating" :
       (LOW_RATING_FIELDS.indexOf(col.key) !== -1 && isHighRating(v) ? " high-rating" : "");
+    if (col.key === "followUpDue" && dueClass(v)) ratingCls = " " + dueClass(v);
     var cls = ratingCls ? ' class="' + ratingCls.trim() + '"' : "";
     return '<input type="' + type + '" value="' + esc + '" data-id="' + job.id + '" data-field="' + col.key +
       '"' + cls + extra + NO_ASSIST_ATTRS + '>';
@@ -2746,6 +2783,7 @@
       el.classList.toggle("low-rating", isLowRating(el.value));
       el.classList.toggle("high-rating", isHighRating(el.value));
     }
+    if (field === "followUpDue") applyDueClass(el, el.value);
     if (field === "postingUrl") {
       var openLink = el.closest("td").querySelector("a.icon-btn");
       if (openLink) {
@@ -2872,6 +2910,7 @@
       }
     });
     document.getElementById("d-excitement-stars").innerHTML = starButtonsHtml(job.excitement, 'data-field="excitement"');
+    applyDueClass(document.getElementById("d-followUpDue"), job.followUpDue);
     updateDealbreakersVisibility(job);
     urlFieldSyncs["d-companyUrl"]();
     urlFieldSyncs["d-postingUrl"]();
@@ -3092,6 +3131,7 @@
         el.classList.toggle("low-rating", isLowRating(el.value));
         el.classList.toggle("high-rating", isHighRating(el.value));
       }
+      if (m[1] === "followUpDue") applyDueClass(el, el.value);
       save(job);
     }
   });
@@ -3330,7 +3370,14 @@
   // land after the lag caught up, so they'd reappear). The stale in-flight-write timeout
   // below is a safe fix for the original stuck-forever symptom; this one wasn't.
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) return;
+    if (!document.hidden) {
+      // Back on screen, possibly on a new day — recolor Due dates without touching any data.
+      document.querySelectorAll('#tbody input[data-field="followUpDue"]').forEach(function (cell) {
+        var j = findJob(cell.getAttribute("data-id"));
+        if (j) applyDueClass(cell, j.followUpDue);
+      });
+      return;
+    }
     var active = document.activeElement;
     if (active && active.closest && active.closest("#tbody")) active.blur();
   });
