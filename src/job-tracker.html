@@ -2078,7 +2078,7 @@
   function blankCompany(name) {
     var key = companyKey(name);
     return { id: companySlug(key), key: key, name: String(name || "").trim(), createdAt: Date.now(), updatedAt: Date.now(),
-      myRating: "", linkedin: "", companyUrl: "", generalNotes: "", manual: false,
+      myRating: "", linkedin: "", companyUrl: "", generalNotes: "", manual: false, keep: false, pto: "", medical: "",
       recommendPercent: "", reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "" };
   }
   function normalizeCompany(data) {
@@ -2216,6 +2216,9 @@
     r.companyUrl = (e.rec && e.rec.companyUrl) || (urls.length ? urls[0].text : "");
     r.ptoItems = textItems(e.jobs, "pto");
     r.medicalItems = textItems(e.jobs, "medical");
+    // No job text left (e.g. the last job was deleted): fall back to what the company record kept.
+    if (!r.ptoItems.length && e.rec && !blankText(e.rec.pto)) r.ptoItems = [{ text: String(e.rec.pto).trim(), labels: [] }];
+    if (!r.medicalItems.length && e.rec && !blankText(e.rec.medical)) r.medicalItems = [{ text: String(e.rec.medical).trim(), labels: [] }];
     r.pto = r.ptoItems.map(function (i) { return i.text; }).join(" · ");
     r.medical = r.medicalItems.map(function (i) { return i.text; }).join(" · ");
     e.roll = r;
@@ -2232,7 +2235,7 @@
     state.contacts.forEach(function (c) { var e = entry(contactCompanyName(c)); if (e) e.contacts.push(c); });
     state.companies.forEach(function (r) {
       if (map[r.key]) map[r.key].rec = r;
-      else if (r.manual || r.myRating || r.linkedin || r.companyUrl || r.generalNotes) {
+      else if (r.manual || r.keep || r.myRating || r.linkedin || r.companyUrl || r.generalNotes) {
         map[r.key] = { key: r.key, name: r.name || r.key, jobs: [], contacts: [], rec: r };
       }
     });
@@ -3229,6 +3232,7 @@
     if (action === "view") { openDrawer(id); return; }
     if (action === "delete") {
       if (await askConfirm("Delete this record? This can't be undone.")) {
+        keepCompanyOnJobDelete(job);
         state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
         localSave();
         deleteFromDb(id);
@@ -3480,8 +3484,9 @@
     { key: "medical", label: "Medical", type: "text", w: "170px", get: function (e) { return e.roll.medical; } }
   ];
 
-  function companyActionsInnerHtml(key) {
-    return '<button class="icon-btn" data-action="view-company" data-ckey="' + escapeHtml(key) + '" title="Open company" aria-label="Open company">⤢</button>';
+  function companyActionsInnerHtml(key, deletable) {
+    return '<button class="icon-btn" data-action="view-company" data-ckey="' + escapeHtml(key) + '" title="Open company" aria-label="Open company">⤢</button>' +
+      (deletable ? '<button class="icon-btn danger" data-action="delete-company" data-ckey="' + escapeHtml(key) + '" title="Delete company" aria-label="Delete company">🗑</button>' : "");
   }
 
   function companyCellInfo(e, col) {
@@ -3540,7 +3545,7 @@
     if (sortCol) entries = entries.slice().sort(function (a, b) { return compareCompanies(a, b, sortCol, state.sortDir); });
 
     // At least as wide as the other tabs' Actions column, so the "Actions" header isn't squeezed.
-    var actionsW = Math.max(measureRowActionsWidth("companies", companyActionsInnerHtml("x")), 80);
+    var actionsW = Math.max(measureRowActionsWidth("companies", companyActionsInnerHtml("x", true)), 80);
     var colgroup = document.getElementById("colgroup");
     var totalW = actionsW;
     colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + COMPANY_COLS.map(function (c) {
@@ -3567,7 +3572,7 @@
       return;
     }
     tbody.innerHTML = entries.map(function (e) {
-      return '<tr data-ckey="' + escapeHtml(e.key) + '"><td class="actions-col"><div class="row-actions">' + companyActionsInnerHtml(e.key) + "</div></td>" +
+      return '<tr data-ckey="' + escapeHtml(e.key) + '"><td class="actions-col"><div class="row-actions">' + companyActionsInnerHtml(e.key, companyDeletable(e)) + "</div></td>" +
         COMPANY_COLS.map(function (c) { var i = companyCellInfo(e, c); return '<td class="' + i.cls + '">' + i.html + "</td>"; }).join("") + "</tr>";
     }).join("");
   }
@@ -3575,6 +3580,12 @@
   document.getElementById("tbody").addEventListener("click", function (e) {
     var btn = e.target.closest('button[data-action="open-company-key"], button[data-action="view-company"]');
     if (btn) { openCompanyDrawer(btn.getAttribute("data-ckey")); return; }
+    var delBtn = e.target.closest('button[data-action="delete-company"]');
+    if (delBtn) {
+      var delEntry = findCompanyEntry(delBtn.getAttribute("data-ckey"));
+      if (delEntry) deleteCompanyEntry(delEntry).then(function (done) { if (done) renderTable(); });
+      return;
+    }
     var star = e.target.closest(".star-btn[data-co]");
     if (star) {
       var key = star.getAttribute("data-co");
@@ -3636,7 +3647,7 @@
     if (nameEl !== document.activeElement) nameEl.value = e.name;
     nameEl.readOnly = !renamable;
     nameEl.title = renamable ? "" : "Named after its jobs and contacts — change the name there";
-    $co("co-delete").style.display = renamable && !e.contacts.length ? "" : "none";
+    $co("co-delete").style.display = companyDeletable(e) ? "" : "none";
     $co("co-sub").textContent = e.jobs.length + (e.jobs.length === 1 ? " job" : " jobs") + " · " + e.contacts.length + (e.contacts.length === 1 ? " contact" : " contacts");
     $co("co-myRating-stars").innerHTML = starButtonsHtml(e.rec ? e.rec.myRating : "", 'data-co="1"');
     [["co-recommend", r.recommend], ["co-gRating", r.gRating], ["co-gReviews", r.gReviews], ["co-iRating", r.iRating], ["co-iReviews", r.iReviews]].forEach(function (p) {
@@ -3964,7 +3975,7 @@
     if (existing) {
       // Same name means same company (they're matched by name), so continuing opens the
       // one that's already there rather than making a second copy.
-      if (!(await askConfirm("A company named “" + existing.name + "” already exists. Do you want to continue?", "Continue"))) return;
+      if (!(await askConfirm("A company named “" + existing.name + "” already exists. Do you want to continue?", "Continue", { danger: false }))) return;
       openCompanyDrawer(existing.key);
       return;
     }
@@ -3985,7 +3996,44 @@
 
   // Renaming — only for companies added by hand with no job attached (everyone else takes
   // its name from its jobs/contacts, so the name is edited there).
-  var COMPANY_OWN_FIELDS = ["myRating", "linkedin", "companyUrl", "generalNotes", "recommendPercent", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount"];
+  var COMPANY_OWN_FIELDS = ["myRating", "linkedin", "companyUrl", "generalNotes", "recommendPercent", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "pto", "medical"];
+
+  // Deleting a job must not make its company vanish from the Companies tab. When the last
+  // job at a company is about to go, the company gets (or keeps) a stored record flagged
+  // `keep`, and what the row was showing — ratings, URL, PTO, Medical — is copied onto it
+  // so the row looks the same afterwards. Call before removing the job from state.jobs.
+  function keepCompanyOnJobDelete(job) {
+    var key = companyKey(job.company);
+    if (!key) return;
+    if (state.jobs.some(function (j) { return j !== job && companyKey(j.company) === key; })) return;
+    var entry = findCompanyEntry(key);
+    var rec = ensureCompanyRec(key, job.company);
+    if (rec.keep) return;
+    rec.keep = true;
+    if (entry) {
+      var r = entry.roll;
+      [["recommendPercent", r.recommend], ["reviewPercent", r.gRating], ["reviewCount", r.gReviews], ["indeedRating", r.iRating],
+        ["indeedReviewCount", r.iReviews], ["companyUrl", r.companyUrl], ["pto", r.pto], ["medical", r.medical]].forEach(function (p) {
+        if (blankText(rec[p[0]]) && !blankText(p[1])) rec[p[0]] = p[1];
+      });
+    }
+    saveCompany(rec, true);
+  }
+  // A company can be deleted when it has a stored record of its own (added by hand, or left
+  // behind by a deleted job) and no job: that removes only the company record, never a job.
+  function companyDeletable(e) { return !!(e.rec && (e.rec.manual || e.rec.keep) && !e.jobs.length); }
+  async function deleteCompanyEntry(e) {
+    if (!companyDeletable(e)) return false;
+    var n = e.contacts.length;
+    var msg = "Delete “" + e.name + "”? This can't be undone." +
+      (n ? " Its " + n + (n === 1 ? " contact is" : " contacts are") + " not deleted, so the company will keep showing up while they exist." : "");
+    if (!(await askConfirm(msg, "Delete"))) return false;
+    var rec = e.rec;
+    state.companies = state.companies.filter(function (c) { return c !== rec; });
+    localSaveCompanies();
+    deleteCompanyFromDb(rec.id);
+    return true;
+  }
   function deleteCompanyFromDb(id) {
     if (companyWriteTimers[id]) { clearTimeout(companyWriteTimers[id]); delete companyWriteTimers[id]; delete pendingCompanyWrites[id]; }
     if (!companiesCol) return;
@@ -3995,20 +4043,6 @@
     state.contacts.forEach(function (c) {
       if (!c.jobId && companyKey(c.company) === oldKey) { c.company = newName; saveContact(c, false); }
     });
-  }
-  function mergeCompanyInto(rec, target) {
-    COMPANY_OWN_FIELDS.forEach(function (f) {
-      if (blankText(rec[f])) return;
-      if (f === "generalNotes") {
-        if (blankText(target[f])) target[f] = rec[f];
-        else if (target[f].indexOf(rec[f]) === -1) target[f] = target[f] + "\n\n" + rec[f];
-      } else if (blankText(target[f])) target[f] = rec[f];
-    });
-    retargetStandaloneContacts(rec.key, target.name);
-    state.companies = state.companies.filter(function (c) { return c !== rec; });
-    localSaveCompanies();
-    deleteCompanyFromDb(rec.id);
-    saveCompany(target, true);
   }
   async function renameActiveCompany() {
     var input = $co("co-name");
@@ -4024,10 +4058,9 @@
     }
     var other = findCompanyEntry(newKey);
     if (other) {
-      if (!(await askConfirm("A company named “" + other.name + "” already exists. Do you want to continue?", "Continue"))) { input.value = e.name; return; }
-      var target = ensureCompanyRec(other.key, other.name);
-      mergeCompanyInto(rec, target);
-      openCompanyDrawer(other.key);
+      // Nothing is renamed or merged; the typed name is dropped and the viewer can jump to the existing company.
+      input.value = e.name;
+      if (await askConfirm("A company named “" + other.name + "” already exists.", "View existing", { danger: false })) openCompanyDrawer(other.key);
       return;
     }
     var nr = blankCompany(newName);
@@ -4045,13 +4078,7 @@
   document.getElementById("co-name").addEventListener("change", renameActiveCompany);
   document.getElementById("co-delete").addEventListener("click", async function () {
     var e = coActiveKey && currentCompanyEntry();
-    if (!e || !e.rec || !e.rec.manual || e.jobs.length || e.contacts.length) return;
-    if (!(await askConfirm("Delete this company? This can't be undone.", "Delete"))) return;
-    var rec = e.rec;
-    state.companies = state.companies.filter(function (c) { return c !== rec; });
-    localSaveCompanies();
-    deleteCompanyFromDb(rec.id);
-    closeCompanyDrawer();
+    if (e && await deleteCompanyEntry(e)) closeCompanyDrawer();
   });
 
   // ---------- Confirm dialog ----------
@@ -4064,9 +4091,10 @@
   var confirmOkBtn = document.getElementById("confirm-ok");
   var confirmResolve = null;
 
-  function askConfirm(message, okLabel) {
+  function askConfirm(message, okLabel, opts) {
     confirmMessageEl.textContent = message;
     confirmOkBtn.textContent = okLabel || "Delete";
+    confirmOkBtn.classList.toggle("danger-btn", !(opts && opts.danger === false));
     confirmScrim.classList.add("open");
     confirmModalEl.classList.add("open");
     confirmModalEl.setAttribute("aria-hidden", "false");
@@ -4090,6 +4118,8 @@
     if (!state.activeId) return;
     if (await askConfirm("Delete this record? This can't be undone.")) {
       var id = state.activeId;
+      var doomed = findJob(id);
+      if (doomed) keepCompanyOnJobDelete(doomed);
       state.jobs = state.jobs.filter(function (j) { return j.id !== id; });
       localSave();
       deleteFromDb(id);
