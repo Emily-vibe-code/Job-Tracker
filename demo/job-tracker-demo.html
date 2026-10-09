@@ -1105,8 +1105,10 @@
     <div class="section">
       <p class="section-title">Contact details</p>
       <div class="field-grid">
-        <div class="field"><label for="cd-phone">Phone number</label><input type="tel" id="cd-phone" placeholder="e.g. (555) 123-4567"></div>
-        <div class="field"><label for="cd-email">Email address</label><input type="email" id="cd-email" placeholder="name@company.com"></div>
+        <div class="field"><label for="cd-businessPhone">Business #</label><input type="tel" id="cd-businessPhone" placeholder="e.g. (555) 123-4567"></div>
+        <div class="field"><label for="cd-cellPhone">Cell #</label><input type="tel" id="cd-cellPhone" placeholder="e.g. (555) 123-4567"></div>
+        <div class="field"><label for="cd-businessEmail">Business email</label><input type="email" id="cd-businessEmail" placeholder="name@company.com"></div>
+        <div class="field"><label for="cd-personalEmail">Personal email</label><input type="email" id="cd-personalEmail" placeholder="name@example.com"></div>
         <div class="field"><label for="cd-linkedin">LinkedIn</label>
           <div class="url-input-row"><a class="icon-btn" id="cd-linkedin-open" href="#" target="_blank" rel="noopener" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a><input type="text" id="cd-linkedin" placeholder="https://linkedin.com/in/..."></div>
         </div>
@@ -1660,6 +1662,7 @@
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
     migrateEmbeddedContacts();
+    migrateContactFields();
     migrateValuesNotes();
     backfillFollowUpDue();
 
@@ -1678,6 +1681,7 @@
     contactsCol.orderBy("createdAt").onSnapshot(function (snap) {
       if (isSyncSensitive()) return;
       mergeContactsFromSnapshot(snap.docs.map(function (d) { return normalizeContact(d.data()); }));
+      migrateContactFields();
       localSaveContacts();
       renderTable();
     }, function () {
@@ -1941,7 +1945,9 @@
   function blankContact() {
     return {
       id: uid(), jobId: null, createdAt: Date.now(), updatedAt: Date.now(),
-      name: "", connection: "", phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
+      name: "", connection: "", businessPhone: "", cellPhone: "", businessEmail: "", personalEmail: "",
+      // Legacy single fields — only kept so migrateContactFields() can move old values over.
+      phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
       // Snapshot of the linked job's company name. Kept in sync with the live job
       // (see syncContactCompany) while it exists, so the name survives if that job is
       // ever deleted instead of just vanishing along with it.
@@ -2017,6 +2023,32 @@
     if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
     contactsCol.doc(id).delete().catch(function () { /* local copy still removed either way */ });
   }
+
+
+  // The single Phone number / Email address fields became Business # / Cell # and Business
+  // email / Personal email. Whatever was already saved under the old fields moves to the
+  // Business ones (the old fields are then cleared) so nothing is lost; it can be moved to
+  // Cell # / Personal email by hand. Idempotent — only touches contacts still holding old values.
+  function migrateContactFields() {
+    var touched = [];
+    state.contacts.forEach(function (c) {
+      var changed = false;
+      if (!blankText(c.phone)) {
+        var pk = blankText(c.businessPhone) ? "businessPhone" : (blankText(c.cellPhone) ? "cellPhone" : null);
+        if (pk) { c[pk] = c.phone; c.phone = ""; changed = true; }
+      }
+      if (!blankText(c.email)) {
+        var ek = blankText(c.businessEmail) ? "businessEmail" : (blankText(c.personalEmail) ? "personalEmail" : null);
+        if (ek) { c[ek] = c.email; c.email = ""; changed = true; }
+      }
+      if (changed) touched.push(c);
+    });
+    if (touched.length) {
+      localSaveContacts();
+      touched.forEach(function (c) { saveContact(c, true); });
+    }
+  }
+  function isPhoneField(f) { return f === "businessPhone" || f === "cellPhone"; }
 
   function normalizeContact(data) {
     var c = blankContact();
@@ -2330,6 +2362,7 @@
   state.companies = loadCompanies();
   if (!state.jobs.length && !state.contacts.length) seedDemoData();
   migrateEmbeddedContacts();
+  migrateContactFields();
   migrateValuesNotes();
   state.colWidths = loadColWidths();
 
@@ -2939,8 +2972,10 @@
   var CONTACT_COLS = [
     { key: "name", label: "Name", type: "text", w: "150px" },
     { key: "connection", label: "Connection", type: "text", w: "130px" },
-    { key: "phone", label: "Phone number", type: "tel", w: "140px" },
-    { key: "email", label: "Email address", type: "email", w: "190px" },
+    { key: "businessPhone", label: "Business #", type: "tel", w: "140px" },
+    { key: "cellPhone", label: "Cell #", type: "tel", w: "140px" },
+    { key: "businessEmail", label: "Business email", type: "email", w: "190px" },
+    { key: "personalEmail", label: "Personal email", type: "email", w: "190px" },
     { key: "company", label: "Company", type: "link", w: "160px" },
     { key: "dateOfContact", label: "Date of contact", type: "date", w: "130px" },
     { key: "linkedin", label: "LinkedIn", type: "url", w: "170px" }
@@ -3061,8 +3096,10 @@
         '<td class="actions-col"><div class="row-actions">' + contactActionsInnerHtml(c.id) + "</div></td>" +
         '<td><input type="text" value="' + esc(c.name) + '" data-cid="' + c.id + '" data-cfield="name"' + NO_ASSIST_ATTRS + "></td>" +
         '<td><input type="text" value="' + esc(c.connection) + '" data-cid="' + c.id + '" data-cfield="connection"' + NO_ASSIST_ATTRS + "></td>" +
-        '<td><input type="tel" value="' + esc(c.phone) + '" data-cid="' + c.id + '" data-cfield="phone"' + NO_ASSIST_ATTRS + "></td>" +
-        '<td><input type="email" value="' + esc(c.email) + '" data-cid="' + c.id + '" data-cfield="email"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="tel" value="' + esc(c.businessPhone) + '" data-cid="' + c.id + '" data-cfield="businessPhone"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="tel" value="' + esc(c.cellPhone) + '" data-cid="' + c.id + '" data-cfield="cellPhone"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="email" value="' + esc(c.businessEmail) + '" data-cid="' + c.id + '" data-cfield="businessEmail"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="email" value="' + esc(c.personalEmail) + '" data-cid="' + c.id + '" data-cfield="personalEmail"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="' + (job ? "cell-text" : "") + '">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
         '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
@@ -3149,7 +3186,7 @@
     if (!cid || !field) return;
     var c = findContact(cid);
     if (!c) return;
-    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    if (isPhoneField(field)) el.value = formatPhoneNumber(el.value);
     c[field] = el.value;
     saveContact(c, false);
     if (field === "linkedin") {
@@ -3449,7 +3486,7 @@
   var cdDrawer = document.getElementById("cd-drawer");
   var cdCompanyLink = document.getElementById("cd-company-link");
   var cdCompanyInput = document.getElementById("cd-company");
-  var CD_FIELDS = ["phone", "email", "linkedin", "dateOfContact"];
+  var CD_FIELDS = ["businessPhone", "cellPhone", "businessEmail", "personalEmail", "linkedin", "dateOfContact"];
   var cdActiveId = null;
 
   function findContact(cid) {
@@ -3527,7 +3564,7 @@
   cdCompanyInput.addEventListener("input", function (e) { saveActiveContactField("company", e.target.value); });
   CD_FIELDS.forEach(function (f) {
     document.getElementById("cd-" + f).addEventListener("input", function (e) {
-      if (f === "phone") e.target.value = formatPhoneNumber(e.target.value);
+      if (isPhoneField(f)) e.target.value = formatPhoneNumber(e.target.value);
       saveActiveContactField(f, e.target.value);
     });
   });
@@ -3759,8 +3796,10 @@
       '<div class="card-grid">' +
       field2("Name", "text", c.name, c.id, "name") +
       field2("Connection", "text", c.connection, c.id, "connection") +
-      field2("Phone", "tel", c.phone, c.id, "phone") +
-      field2("Email", "email", c.email, c.id, "email") +
+      field2("Business #", "tel", c.businessPhone, c.id, "businessPhone") +
+      field2("Cell #", "tel", c.cellPhone, c.id, "cellPhone") +
+      field2("Business email", "email", c.businessEmail, c.id, "businessEmail") +
+      field2("Personal email", "email", c.personalEmail, c.id, "personalEmail") +
       field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
       field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
       '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
@@ -3906,7 +3945,7 @@
     if (!cid || !field) return;
     var c = findContact(cid);
     if (!c) return;
-    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    if (isPhoneField(field)) el.value = formatPhoneNumber(el.value);
     c[field] = el.value;
     saveContact(c, false);
   });
@@ -4540,7 +4579,7 @@
     if (!cid || !field) return;
     var c = findContact(cid);
     if (!c) return;
-    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    if (isPhoneField(field)) el.value = formatPhoneNumber(el.value);
     c[field] = el.value;
     saveContact(c, false);
   });
