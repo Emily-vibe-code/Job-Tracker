@@ -3975,7 +3975,7 @@
     if (existing) {
       // Same name means same company (they're matched by name), so continuing opens the
       // one that's already there rather than making a second copy.
-      if (!(await askConfirm("A company named “" + existing.name + "” already exists. Do you want to continue?", "Continue", { danger: false }))) return;
+      if (!(await askConfirm("A company named “" + existing.name + "” already exists.", "View existing", { danger: false }))) return;
       openCompanyDrawer(existing.key);
       return;
     }
