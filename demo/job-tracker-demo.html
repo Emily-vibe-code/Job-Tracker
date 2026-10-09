@@ -4326,10 +4326,21 @@
     mergeChecked[key] = e.target.checked;
     updateMergeSummary();
   });
-  mergeConfirmBtn.addEventListener("click", function () {
+  mergeConfirmBtn.addEventListener("click", async function () {
     var sel = mergeSelection();
     if (!sel.targetName || sel.entries.length < 2) return;
+    // Nothing merges until this second, explicit confirmation. Cancel returns to the merge
+    // window with the same choices still ticked.
     closeMergeModal();
+    var names = sel.entries.map(function (e) { return "“" + e.name + "”"; }).join(", ");
+    var sure = await askConfirm("Are you sure you want to merge " + names + " into “" + sel.targetName + "”? This renames their jobs and contacts and can't be undone.", "Yes, merge", { danger: false });
+    if (!sure) {
+      mergeScrim.classList.add("open");
+      mergeModal.classList.add("open");
+      mergeModal.setAttribute("aria-hidden", "false");
+      return;
+    }
+    sel = mergeSelection();
     performCompanyMerge(sel);
     renderTable();
     openCompanyDrawer(sel.targetKey);
