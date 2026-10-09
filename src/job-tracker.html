@@ -921,6 +921,20 @@
   }
   .paste-modal input.modal-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); }
 
+
+  #merge-modal { width: min(540px, 94vw); }
+  #merge-scrim { z-index: 50; }
+  .merge-field-label { display: block; font-size: 0.72rem; color: var(--ink-faint); font-weight: 500; margin: 12px 0 4px; }
+  #merge-list { max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; margin-top: 6px; background: var(--surface); }
+  .merge-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.86rem; cursor: pointer; }
+  .merge-row:last-child { border-bottom: none; }
+  .merge-row:hover { background: var(--surface-alt); }
+  .merge-row input { flex: none; accent-color: var(--accent); }
+  .merge-row .m-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .merge-row .m-meta { color: var(--ink-faint); font-size: 0.76rem; white-space: nowrap; }
+  .merge-row .m-tag { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent-soft-ink); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; }
+  #merge-summary { margin: 12px 0 0; font-size: 0.82rem; color: var(--ink-muted); }
+
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -1180,9 +1194,26 @@
   </div>
   <div class="drawer-foot">
     <span class="stage-badge stage-applied">Company</span>
+    <button class="btn" id="co-merge" type="button">Merge companies…</button>
     <button class="icon-btn danger" id="co-delete" type="button" aria-label="Delete company" title="Delete company" style="display:none;">🗑</button>
   </div>
 </aside>
+
+<div class="scrim" id="merge-scrim"></div>
+<div class="paste-modal" id="merge-modal" aria-hidden="true" role="dialog" aria-labelledby="merge-title">
+  <h2 id="merge-title">Merge companies</h2>
+  <p>Tick the companies that are the same as this one. Every job and contact under them is renamed to the name below, and their company details are combined into one.</p>
+  <label class="merge-field-label" for="merge-name">Name to keep</label>
+  <input type="text" id="merge-name" class="modal-input" autocomplete="off" spellcheck="false">
+  <label class="merge-field-label" for="merge-search">Companies to merge in</label>
+  <input type="text" id="merge-search" class="modal-input" placeholder="Search companies" autocomplete="off" spellcheck="false">
+  <div id="merge-list"></div>
+  <p id="merge-summary"></p>
+  <div class="paste-modal-actions">
+    <button type="button" id="merge-cancel" class="btn">Cancel</button>
+    <button type="button" id="merge-confirm" class="btn btn-primary">Merge</button>
+  </div>
+</div>
 
 <div class="scrim" id="addco-scrim"></div>
 <div class="paste-modal" id="addco-modal" aria-hidden="true" role="dialog" aria-labelledby="addco-title">
@@ -4099,6 +4130,165 @@
     var el = e.target;
     if (!el.getAttribute) return;
     if (el.getAttribute("data-cfield") === "company" || el.id === "cd-company") ensureCompanyFromName(el.value);
+  });
+
+
+  // ---------- Merge companies ----------
+  // Companies are matched by name, so merging means giving every job and contact under the
+  // chosen companies one common name and folding their company records into one. The
+  // result is the same company everywhere (including the Jobs/Applied/Interviewing/Rejected
+  // tabs). It can't be undone.
+  var mergeScrim = document.getElementById("merge-scrim");
+  var mergeModal = document.getElementById("merge-modal");
+  var mergeNameEl = document.getElementById("merge-name");
+  var mergeSearchEl = document.getElementById("merge-search");
+  var mergeListEl = document.getElementById("merge-list");
+  var mergeSummaryEl = document.getElementById("merge-summary");
+  var mergeConfirmBtn = document.getElementById("merge-confirm");
+  var mergeCandidates = [];
+  var mergeChecked = {};
+
+  function editDistance(a, b) {
+    var prev = [], cur = [], i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur = [i];
+      for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  // Names that plausibly refer to the same company: one contains the other, they start the
+  // same way (first word, 4+ letters), or they're a couple of typos apart.
+  function similarCompanyKeys(a, b) {
+    if (a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return true;
+    var fa = a.split(" ")[0], fb = b.split(" ")[0];
+    if (fa.length >= 4 && fb.length >= 4 && (fa === fb || editDistance(fa, fb) <= 1)) return true;
+    return editDistance(a, b) <= Math.max(2, Math.floor(Math.min(a.length, b.length) * 0.2));
+  }
+
+  function mergeSelection() {
+    var cur = findCompanyEntry(coActiveKey);
+    var targetName = mergeNameEl.value.trim();
+    var targetKey = companyKey(targetName);
+    var keys = [coActiveKey];
+    Object.keys(mergeChecked).forEach(function (k) { if (mergeChecked[k] && keys.indexOf(k) === -1) keys.push(k); });
+    // A name that already belongs to some other company pulls that company in as well.
+    if (targetKey && keys.indexOf(targetKey) === -1 && mergeCandidates.some(function (e) { return e.key === targetKey; })) keys.push(targetKey);
+    var idx = buildCompanyIndex();
+    var entries = keys.map(function (k) { return idx.filter(function (e) { return e.key === k; })[0]; }).filter(Boolean);
+    return { targetName: targetName, targetKey: targetKey, entries: entries, cur: cur };
+  }
+  function updateMergeSummary() {
+    var sel = mergeSelection();
+    var jobs = 0, contacts = 0;
+    sel.entries.forEach(function (e) {
+      e.jobs.forEach(function (j) { if (j.company !== sel.targetName) jobs++; });
+      e.contacts.forEach(function (c) { if (contactCompanyName(c) !== sel.targetName) contacts++; });
+    });
+    var others = sel.entries.length - 1;
+    var ready = !!sel.targetName && sel.entries.length > 1;
+    mergeConfirmBtn.disabled = !ready;
+    mergeSummaryEl.textContent = !sel.targetName ? "Enter the name to keep." :
+      (others < 1 ? "Tick at least one other company to merge in." :
+        "Merges " + sel.entries.length + " companies into “" + sel.targetName + "”: " + jobs + (jobs === 1 ? " job" : " jobs") + " and " + contacts +
+        (contacts === 1 ? " contact" : " contacts") + " will be renamed. This can't be undone.");
+  }
+  function renderMergeList() {
+    var q = mergeSearchEl.value.trim().toLowerCase();
+    var rows = mergeCandidates.filter(function (e) { return !q || e.name.toLowerCase().indexOf(q) !== -1; });
+    mergeListEl.innerHTML = rows.length ? rows.map(function (e) {
+      return '<label class="merge-row"><input type="checkbox" data-key="' + escapeHtml(e.key) + '"' + (mergeChecked[e.key] ? " checked" : "") + '>' +
+        '<span class="m-name">' + escapeHtml(e.name) + "</span>" + (e.similar ? '<span class="m-tag">similar</span>' : "") +
+        '<span class="m-meta">' + e.jobs.length + (e.jobs.length === 1 ? " job" : " jobs") + " · " + e.contacts.length + (e.contacts.length === 1 ? " contact" : " contacts") + "</span></label>";
+    }).join("") : '<p style="padding:10px; margin:0; color:var(--ink-faint); font-size:0.82rem;">No other companies match.</p>';
+  }
+  function openMergeModal() {
+    if (!coActiveKey) return;
+    var cur = currentCompanyEntry();
+    mergeCandidates = buildCompanyIndex().filter(function (e) { return e.key !== cur.key; });
+    mergeCandidates.forEach(function (e) { e.similar = similarCompanyKeys(cur.key, e.key); });
+    mergeCandidates.sort(function (a, b) {
+      if (a.similar !== b.similar) return a.similar ? -1 : 1;
+      return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0;
+    });
+    mergeChecked = {};
+    mergeNameEl.value = cur.name;
+    mergeSearchEl.value = "";
+    renderMergeList();
+    updateMergeSummary();
+    mergeScrim.classList.add("open");
+    mergeModal.classList.add("open");
+    mergeModal.setAttribute("aria-hidden", "false");
+    mergeSearchEl.focus();
+  }
+  function closeMergeModal() {
+    mergeScrim.classList.remove("open");
+    mergeModal.classList.remove("open");
+    mergeModal.setAttribute("aria-hidden", "true");
+  }
+
+  function performCompanyMerge(sel) {
+    var targetName = sel.targetName, targetKey = sel.targetKey;
+    var entries = sel.entries;
+    // Gather contacts before any job is renamed (their company is read off their job).
+    var contacts = [];
+    entries.forEach(function (e) { e.contacts.forEach(function (c) { if (contacts.indexOf(c) === -1) contacts.push(c); }); });
+    // Fold the company records together: the target's own wins, then the one you're viewing,
+    // then the rest; notes from every record are kept.
+    var target = ensureCompanyRec(targetKey, targetName);
+    var ordered = entries.slice().sort(function (a, b) { return (a.key === sel.cur.key ? 0 : 1) - (b.key === sel.cur.key ? 0 : 1); });
+    var removed = [];
+    ordered.forEach(function (e) {
+      var rec = e.rec;
+      if (!rec || rec === target) return;
+      COMPANY_OWN_FIELDS.forEach(function (f) {
+        if (blankText(rec[f])) return;
+        if (f === "generalNotes") {
+          if (blankText(target[f])) target[f] = rec[f];
+          else if (target[f].indexOf(rec[f]) === -1) target[f] = target[f] + "\n\n" + rec[f];
+        } else if (blankText(target[f])) target[f] = rec[f];
+      });
+      target.manual = target.manual || rec.manual;
+      target.keep = target.keep || rec.keep;
+      removed.push(rec);
+    });
+    target.name = targetName;
+    removed.forEach(function (rec) {
+      state.companies = state.companies.filter(function (c) { return c !== rec; });
+      deleteCompanyFromDb(rec.id);
+    });
+    saveCompany(target, true);
+    // Now every job and contact takes the one name.
+    entries.forEach(function (e) {
+      e.jobs.forEach(function (j) { if (j.company !== targetName) { j.company = targetName; save(j, true); } });
+    });
+    contacts.forEach(function (c) {
+      if (c.company !== targetName) { c.company = targetName; saveContact(c, true); }
+    });
+  }
+
+  document.getElementById("co-merge").addEventListener("click", openMergeModal);
+  document.getElementById("merge-cancel").addEventListener("click", closeMergeModal);
+  mergeScrim.addEventListener("click", closeMergeModal);
+  mergeNameEl.addEventListener("input", updateMergeSummary);
+  mergeSearchEl.addEventListener("input", renderMergeList);
+  mergeListEl.addEventListener("change", function (e) {
+    var key = e.target.getAttribute && e.target.getAttribute("data-key");
+    if (!key) return;
+    mergeChecked[key] = e.target.checked;
+    updateMergeSummary();
+  });
+  mergeConfirmBtn.addEventListener("click", function () {
+    var sel = mergeSelection();
+    if (!sel.targetName || sel.entries.length < 2) return;
+    closeMergeModal();
+    performCompanyMerge(sel);
+    renderTable();
+    openCompanyDrawer(sel.targetKey);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && mergeModal.classList.contains("open")) closeMergeModal();
   });
 
   // ---------- Confirm dialog ----------
