@@ -1202,7 +1202,7 @@
 <div class="scrim" id="merge-scrim"></div>
 <div class="paste-modal" id="merge-modal" aria-hidden="true" role="dialog" aria-labelledby="merge-title">
   <h2 id="merge-title">Merge companies</h2>
-  <p>Tick the companies that are the same as this one. Every job and contact under them is renamed to the name below, and their company details are combined into one.</p>
+  <p>Tick the companies that are the same as this one. The Company name on every job and contact under them is changed to the name below, and their company details are combined into one.</p>
   <label class="merge-field-label" for="merge-name">Name to keep</label>
   <input type="text" id="merge-name" class="modal-input" autocomplete="off" spellcheck="false">
   <label class="merge-field-label" for="merge-search">Companies to merge in</label>
@@ -4239,7 +4239,7 @@
     mergeSummaryEl.textContent = !sel.targetName ? "Enter the name to keep." :
       (others < 1 ? "Tick at least one other company to merge in." :
         "Merges " + sel.entries.length + " companies into “" + sel.targetName + "”: " + jobs + (jobs === 1 ? " job" : " jobs") + " and " + contacts +
-        (contacts === 1 ? " contact" : " contacts") + " will be renamed. This can't be undone.");
+        (contacts === 1 ? " contact" : " contacts") + " will have their Company name changed. This can't be undone.");
   }
   function renderMergeList() {
     var q = mergeSearchEl.value.trim().toLowerCase();
@@ -4333,7 +4333,7 @@
     // window with the same choices still ticked.
     closeMergeModal();
     var names = sel.entries.map(function (e) { return "“" + e.name + "”"; }).join(", ");
-    var sure = await askConfirm("Are you sure you want to merge " + names + " into “" + sel.targetName + "”? This renames their jobs and contacts and can't be undone.", "Yes, merge", { danger: false });
+    var sure = await askConfirm("Are you sure you want to merge " + names + " into “" + sel.targetName + "”? This changes the Company name on their jobs and contacts and can't be undone.", "Yes, merge", { danger: false });
     if (!sure) {
       mergeScrim.classList.add("open");
       mergeModal.classList.add("open");
