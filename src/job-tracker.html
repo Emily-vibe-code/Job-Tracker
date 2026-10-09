@@ -910,6 +910,17 @@
   .co-add-row select { font: inherit; font-size: 0.82rem; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 7px 8px; max-width: 55%; }
   .co-add-row .ghost-btn { flex: 1; }
 
+
+  .drawer-head .titles input[readonly] { cursor: default; }
+  .drawer-head .titles input[readonly]:hover { background: transparent; }
+  .field input[data-cometric] { font-family: "IBM Plex Mono", monospace; }
+  #addco-scrim { z-index: 50; }
+  .paste-modal input.modal-input {
+    width: 100%; font: inherit; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 7px;
+    padding: 9px 10px; background: var(--surface); color: var(--ink); box-sizing: border-box;
+  }
+  .paste-modal input.modal-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); }
+
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -958,6 +969,10 @@
     <div class="add-row" id="add-row">
       <button class="btn btn-primary" id="add-btn" type="button">+ Add job</button>
       <button class="btn" id="paste-btn" type="button">+ Paste from bookmarklet</button>
+    </div>
+    <div class="add-row" id="companies-add-row" style="display:none;">
+      <button class="btn btn-primary" id="add-company" type="button">+ Add company</button>
+      <span class="bookmarklet-hint">Companies from your jobs and contacts appear here on their own.</span>
     </div>
     <div class="add-row" id="contacts-add-row" style="display:none;">
       <button class="btn btn-primary" id="add-contact-standalone" type="button">+ Add contact</button>
@@ -1104,7 +1119,7 @@
 <aside class="drawer" id="co-drawer" aria-hidden="true">
   <div class="drawer-head">
     <div class="titles">
-      <div class="co-title" id="co-title"></div>
+      <input type="text" id="co-name" class="position" placeholder="Company name" aria-label="Company name" readonly>
       <div class="co-sub" id="co-sub"></div>
     </div>
     <button class="icon-btn" id="co-close" type="button" aria-label="Close">✕</button>
@@ -1114,13 +1129,13 @@
       <p class="section-title">Company details</p>
       <div class="field-grid">
         <div class="field"><label>My rating</label><div class="stars-cell" id="co-myRating-stars"></div></div>
-        <div class="field"><label>Recommend</label><div class="ro-value" id="co-recommend"></div></div>
+        <div class="field"><label>Recommend</label><input type="number" data-cometric="recommendPercent" min="0" max="100" step="1" placeholder="%" id="co-recommend"></div>
         <div class="field"><label>Contacts</label><div class="ro-value" id="co-contactCount"></div></div>
-        <div class="field"><label>G Rating</label><div class="ro-value" id="co-gRating"></div></div>
-        <div class="field"><label>G Reviews</label><div class="ro-value" id="co-gReviews"></div></div>
+        <div class="field"><label>G Rating</label><input type="number" data-cometric="reviewPercent" min="0" max="5" step="0.1" id="co-gRating"></div>
+        <div class="field"><label>G Reviews</label><input type="text" inputmode="numeric" data-cometric="reviewCount" id="co-gReviews"></div>
         <div class="field"><label>Follow-up (latest)</label><div class="ro-value" id="co-lastFollowup"></div></div>
-        <div class="field"><label>I Ratings</label><div class="ro-value" id="co-iRating"></div></div>
-        <div class="field"><label>I Reviews</label><div class="ro-value" id="co-iReviews"></div></div>
+        <div class="field"><label>I Ratings</label><input type="number" data-cometric="indeedRating" min="0" max="5" step="0.1" id="co-iRating"></div>
+        <div class="field"><label>I Reviews</label><input type="text" inputmode="numeric" data-cometric="indeedReviewCount" id="co-iReviews"></div>
         <div class="field"><label>Applied (latest)</label><div class="ro-value" id="co-lastApplied"></div></div>
         <div class="field"><label>Interview (latest)</label><div class="ro-value" id="co-lastInterview"></div></div>
         <div class="field span-2"><label for="co-linkedin">LinkedIn</label>
@@ -1132,7 +1147,7 @@
         <div class="field span-2"><label>PTO</label><div class="ro-value" id="co-pto"></div></div>
         <div class="field span-2"><label>Medical</label><div class="ro-value" id="co-medical"></div></div>
       </div>
-      <p class="field-note">Ratings, dates, PTO and Medical are rolled up from this company's jobs and contacts — edit them on the job. Where jobs differ, every entry is shown.</p>
+      <p class="field-note">Recommend and the G / I ratings can be edited here — a change is applied to every job at this company. Dates, PTO and Medical are rolled up from the jobs (edit them there); where jobs differ, every entry is shown.</p>
     </div>
 
     <div class="section">
@@ -1165,8 +1180,20 @@
   </div>
   <div class="drawer-foot">
     <span class="stage-badge stage-applied">Company</span>
+    <button class="icon-btn danger" id="co-delete" type="button" aria-label="Delete company" title="Delete company" style="display:none;">🗑</button>
   </div>
 </aside>
+
+<div class="scrim" id="addco-scrim"></div>
+<div class="paste-modal" id="addco-modal" aria-hidden="true" role="dialog" aria-labelledby="addco-title">
+  <h2 id="addco-title">Add company</h2>
+  <p>Track a company before (or without) any job there. Jobs and contacts with the same name will join it automatically.</p>
+  <input type="text" id="addco-name" class="modal-input" placeholder="Company name" autocomplete="off" spellcheck="false">
+  <div class="paste-modal-actions">
+    <button type="button" id="addco-cancel" class="btn">Cancel</button>
+    <button type="button" id="addco-confirm" class="btn btn-primary">Add company</button>
+  </div>
+</div>
 
 <div class="scrim" id="paste-scrim"></div>
 <div class="paste-modal" id="paste-modal" aria-hidden="true" role="dialog" aria-labelledby="paste-modal-title">
@@ -2051,7 +2078,8 @@
   function blankCompany(name) {
     var key = companyKey(name);
     return { id: companySlug(key), key: key, name: String(name || "").trim(), createdAt: Date.now(), updatedAt: Date.now(),
-      myRating: "", linkedin: "", companyUrl: "", generalNotes: "" };
+      myRating: "", linkedin: "", companyUrl: "", generalNotes: "", manual: false,
+      recommendPercent: "", reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "" };
   }
   function normalizeCompany(data) {
     var c = blankCompany((data && data.name) || "");
@@ -2166,7 +2194,10 @@
     var r = {};
     function grp(keys, names) {
       var j = pickJobGroup(e.jobs, keys);
-      keys.forEach(function (k, i) { r[names[i]] = j && !blankText(j[k]) ? String(j[k]).trim() : ""; });
+      // A company with no job values of its own (e.g. one added by hand) shows what was typed on it.
+      keys.forEach(function (k, i) {
+        r[names[i]] = j && !blankText(j[k]) ? String(j[k]).trim() : (!j && e.rec && !blankText(e.rec[k]) ? String(e.rec[k]).trim() : "");
+      });
     }
     grp(["reviewPercent", "reviewCount"], ["gRating", "gReviews"]);
     grp(["indeedRating", "indeedReviewCount"], ["iRating", "iReviews"]);
@@ -2201,7 +2232,7 @@
     state.contacts.forEach(function (c) { var e = entry(contactCompanyName(c)); if (e) e.contacts.push(c); });
     state.companies.forEach(function (r) {
       if (map[r.key]) map[r.key].rec = r;
-      else if (r.myRating || r.linkedin || r.companyUrl || r.generalNotes) {
+      else if (r.manual || r.myRating || r.linkedin || r.companyUrl || r.generalNotes) {
         map[r.key] = { key: r.key, name: r.name || r.key, jobs: [], contacts: [], rec: r };
       }
     });
@@ -2682,6 +2713,13 @@
       var fuEsc = formatDateShort(fu ? fu.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
       return '<input type="text" value="' + fuEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
     }
+    // Company: still an editable cell, with a button beside it that opens that company's
+    // slide-out on the Companies tab.
+    if (col.key === "company") {
+      var coEsc = String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<div class="linkedin-inner"><button type="button" class="icon-btn" data-action="open-company" title="Open company" aria-label="Open company">↗</button>' +
+        '<input type="text" value="' + coEsc + '" data-id="' + job.id + '" data-field="company"' + NO_ASSIST_ATTRS + '></div>';
+    }
     // Date columns render as plain text at rest (year hidden — see formatDateShort)
     // and swap to a real date input, picker included, the moment they're focused;
     // see the tbody focus/focusout handlers.
@@ -2740,6 +2778,7 @@
 
     document.getElementById("add-row").style.display = (stage === "contacts" || stage === "companies") ? "none" : "flex";
     document.getElementById("contacts-add-row").style.display = stage === "contacts" ? "flex" : "none";
+    document.getElementById("companies-add-row").style.display = stage === "companies" ? "flex" : "none";
 
     if (stage === "contacts") { renderContactsTab(); return; }
     if (stage === "companies") { renderCompaniesTab(); return; }
@@ -2955,7 +2994,7 @@
     if (openJobBtn) { openDrawer(openJobBtn.getAttribute("data-job-id")); return; }
     var openCoBtn = e.target.closest('button[data-action="open-company"]');
     if (openCoBtn) {
-      var coInput = openCoBtn.parentElement.querySelector('input[data-cfield="company"]');
+      var coInput = openCoBtn.parentElement.querySelector('input[data-cfield="company"], input[data-field="company"]');
       goToCompany(coInput ? coInput.value : openCoBtn.getAttribute("data-company"));
       return;
     }
@@ -3426,16 +3465,16 @@
   var COMPANY_COLS = [
     { key: "name", label: "Company", type: "name", w: "180px", get: function (e) { return e.name; } },
     { key: "myRating", label: "My rating", type: "stars", w: "130px", num: true, get: function (e) { return e.rec ? e.rec.myRating : ""; } },
-    { key: "recommend", label: "Recommend", type: "pct", w: "108px", num: true, get: function (e) { return e.roll.recommend; } },
-    { key: "gRating", label: "G Rating", type: "num", w: "96px", num: true, get: function (e) { return e.roll.gRating; } },
-    { key: "gReviews", label: "G Reviews", type: "reviews", w: "100px", num: true, get: function (e) { return e.roll.gReviews; } },
-    { key: "iRating", label: "I Ratings", type: "num", w: "96px", num: true, get: function (e) { return e.roll.iRating; } },
-    { key: "iReviews", label: "I Reviews", type: "reviews", w: "100px", num: true, get: function (e) { return e.roll.iReviews; } },
-    { key: "linkedin", label: "LinkedIn", type: "url", w: "170px", get: function (e) { return e.roll.linkedin; } },
+    { key: "recommend", label: "Recommend", type: "metric", field: "recommendPercent", min: 0, max: 100, step: 1, w: "108px", num: true, get: function (e) { return e.roll.recommend; } },
+    { key: "gRating", label: "G Rating", type: "metric", field: "reviewPercent", min: 0, max: 5, step: 0.1, w: "96px", num: true, get: function (e) { return e.roll.gRating; } },
+    { key: "gReviews", label: "G Reviews", type: "metric", field: "reviewCount", w: "100px", num: true, get: function (e) { return e.roll.gReviews; } },
+    { key: "iRating", label: "I Ratings", type: "metric", field: "indeedRating", min: 0, max: 5, step: 0.1, w: "96px", num: true, get: function (e) { return e.roll.iRating; } },
+    { key: "iReviews", label: "I Reviews", type: "metric", field: "indeedReviewCount", w: "100px", num: true, get: function (e) { return e.roll.iReviews; } },
     { key: "contactCount", label: "Contacts", type: "count", w: "88px", num: true, get: function (e) { return e.roll.contactCount; } },
     { key: "lastFollowup", label: "Follow-up", type: "date", w: "100px", get: function (e) { return e.roll.lastFollowup; } },
     { key: "lastApplied", label: "Applied", type: "date", w: "100px", get: function (e) { return e.roll.lastApplied; } },
     { key: "lastInterview", label: "Interview", type: "date", w: "100px", get: function (e) { return e.roll.lastInterview; } },
+    { key: "linkedin", label: "LinkedIn", type: "url", w: "170px", get: function (e) { return e.roll.linkedin; } },
     { key: "companyUrl", label: "Company URL", type: "url", w: "190px", get: function (e) { return e.roll.companyUrl; } },
     { key: "pto", label: "PTO", type: "text", w: "150px", get: function (e) { return e.roll.pto; } },
     { key: "medical", label: "Medical", type: "text", w: "170px", get: function (e) { return e.roll.medical; } }
@@ -3453,6 +3492,10 @@
         return { cls: "cell-text", html: '<button type="button" class="link-btn" data-action="open-company-key" data-ckey="' + escapeHtml(e.key) + '">' + escapeHtml(e.name) + "</button>" };
       case "stars":
         return { cls: "", html: starsCellHtml(v, 'data-co="' + escapeHtml(e.key) + '"') };
+      case "metric":
+        var rev = isReviewMetric(col.field);
+        return { cls: "", html: '<input type="' + (rev ? "text" : "number") + '" value="' + escapeHtml(metricDisplay(col.field, v)) + '" data-co="' + escapeHtml(e.key) +
+          '" data-cometric="' + col.field + '"' + (rev ? ' inputmode="numeric"' : ' inputmode="decimal" min="' + col.min + '" max="' + col.max + '" step="' + col.step + '"') + NO_ASSIST_ATTRS + ">" };
       case "url":
         var open = v
           ? '<a href="' + escapeHtml(normalizeUrl(v)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open" aria-label="Open link">↗</a>'
@@ -3460,9 +3503,7 @@
         return { cls: "linkedin-cell", html: '<div class="linkedin-inner">' + open + '<input type="text" value="' + escapeHtml(v) + '" placeholder="https://" data-co="' +
           escapeHtml(e.key) + '" data-cofield="' + col.key + '"' + NO_ASSIST_ATTRS + "></div>" };
       default:
-        var text = col.type === "pct" ? (v !== "" ? v + "%" : "") :
-          col.type === "reviews" ? formatWithCommas(v) :
-          col.type === "date" ? formatDateShort(v) : String(v);
+        var text = col.type === "date" ? formatDateShort(v) : String(v);
         return { cls: "cell-text", html: '<span title="' + escapeHtml(col.type === "text" ? v : text) + '">' + escapeHtml(text) + "</span>" };
     }
   }
@@ -3498,7 +3539,8 @@
     var sortCol = state.sortKey ? COMPANY_COLS.filter(function (c) { return c.key === state.sortKey; })[0] : null;
     if (sortCol) entries = entries.slice().sort(function (a, b) { return compareCompanies(a, b, sortCol, state.sortDir); });
 
-    var actionsW = measureRowActionsWidth("companies", companyActionsInnerHtml("x"));
+    // At least as wide as the other tabs' Actions column, so the "Actions" header isn't squeezed.
+    var actionsW = Math.max(measureRowActionsWidth("companies", companyActionsInnerHtml("x")), 80);
     var colgroup = document.getElementById("colgroup");
     var totalW = actionsW;
     colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + COMPANY_COLS.map(function (c) {
@@ -3589,14 +3631,18 @@
   // in the slide-out (never touches the editable inputs or the contact/follow-up lists).
   function fillCompanyStatic(e) {
     var r = e.roll;
-    $co("co-title").textContent = e.name;
+    var nameEl = $co("co-name");
+    var renamable = !!(e.rec && e.rec.manual && !e.jobs.length);
+    if (nameEl !== document.activeElement) nameEl.value = e.name;
+    nameEl.readOnly = !renamable;
+    nameEl.title = renamable ? "" : "Named after its jobs and contacts — change the name there";
+    $co("co-delete").style.display = renamable && !e.contacts.length ? "" : "none";
     $co("co-sub").textContent = e.jobs.length + (e.jobs.length === 1 ? " job" : " jobs") + " · " + e.contacts.length + (e.contacts.length === 1 ? " contact" : " contacts");
     $co("co-myRating-stars").innerHTML = starButtonsHtml(e.rec ? e.rec.myRating : "", 'data-co="1"');
-    setRo("co-recommend", r.recommend !== "" ? r.recommend + "%" : "");
-    setRo("co-gRating", r.gRating);
-    setRo("co-gReviews", formatWithCommas(r.gReviews));
-    setRo("co-iRating", r.iRating);
-    setRo("co-iReviews", formatWithCommas(r.iReviews));
+    [["co-recommend", r.recommend], ["co-gRating", r.gRating], ["co-gReviews", r.gReviews], ["co-iRating", r.iRating], ["co-iReviews", r.iReviews]].forEach(function (p) {
+      var el = $co(p[0]);
+      if (el !== document.activeElement) el.value = metricDisplay(el.getAttribute("data-cometric"), p[1]);
+    });
     setRo("co-contactCount", String(r.contactCount));
     setRo("co-lastFollowup", formatDateFull(r.lastFollowup));
     setRo("co-lastApplied", formatDateFull(r.lastApplied));
@@ -3821,6 +3867,191 @@
     save(job, true);
     renderCompanyFollowups(currentCompanyEntry());
     refreshCompanyDrawer();
+  });
+
+
+  // ---------- Company-level editing: add, rename, ratings ----------
+  var METRIC_ROLL_KEY = { recommendPercent: "recommend", reviewPercent: "gRating", reviewCount: "gReviews", indeedRating: "iRating", indeedReviewCount: "iReviews" };
+  var METRIC_LABEL = { recommendPercent: "Recommend", reviewPercent: "G Rating", reviewCount: "G Reviews", indeedRating: "I Ratings", indeedReviewCount: "I Reviews" };
+  function isReviewMetric(field) { return field === "reviewCount" || field === "indeedReviewCount"; }
+  function normalizeMetric(field, raw) {
+    var s = String(raw === undefined || raw === null ? "" : raw).trim();
+    if (s === "") return "";
+    if (isReviewMetric(field)) return s.replace(/[^0-9]/g, "");
+    var n = parseFloat(s);
+    if (isNaN(n)) return "";
+    n = Math.min(Math.max(n, 0), field === "recommendPercent" ? 100 : 5);
+    return String(n);
+  }
+  function sameMetric(a, b) { return a === b || (a !== "" && b !== "" && parseFloat(a) === parseFloat(b)); }
+  function metricDisplay(field, v) { return isReviewMetric(field) ? formatWithCommas(v) : (v === undefined || v === null ? "" : String(v)); }
+
+  // Writes one of the five ratings to every job at the company (so every tab agrees) and to
+  // the company's own record (which is what a company with no jobs shows). If the company's
+  // jobs currently disagree with each other, nothing is changed until the viewer confirms
+  // the overwrite. Resolves {ok, value}.
+  async function commitCompanyMetric(key, name, field, raw) {
+    var v = normalizeMetric(field, raw);
+    var entry = findCompanyEntry(key);
+    var jobs = entry ? entry.jobs : [];
+    var distinct = [];
+    jobs.forEach(function (j) {
+      var jv = String(j[field] === undefined || j[field] === null ? "" : j[field]).trim();
+      if (jv !== "" && !distinct.some(function (d) { return sameMetric(d, jv); })) distinct.push(jv);
+    });
+    if (distinct.length > 1) {
+      var shownList = distinct.map(function (d) { return metricDisplay(field, d); }).join(", ");
+      var ok = await askConfirm("The jobs at “" + (entry ? entry.name : name) + "” have different values for " + METRIC_LABEL[field] + " (" + shownList + "). Overwrite all of them with " +
+        (v === "" ? "a blank value" : metricDisplay(field, v)) + "?", "Overwrite");
+      if (!ok) return { ok: false };
+      jobs = (findCompanyEntry(key) || { jobs: jobs }).jobs;
+    }
+    jobs.forEach(function (j) {
+      if (!sameMetric(String(j[field] === undefined || j[field] === null ? "" : j[field]).trim(), v)) { j[field] = v; save(j, true); }
+    });
+    var rec = ensureCompanyRec(key, name);
+    rec[field] = v;
+    saveCompany(rec, true);
+    return { ok: true, value: v };
+  }
+  document.addEventListener("change", async function (e) {
+    var el = e.target;
+    var field = el.getAttribute && el.getAttribute("data-cometric");
+    if (!field) return;
+    var inDrawer = !!el.closest("#co-drawer");
+    var key = inDrawer ? coActiveKey : el.getAttribute("data-co");
+    if (!key) return;
+    var entry = findCompanyEntry(key);
+    var name = entry ? entry.name : (inDrawer ? coActiveName : key);
+    var res = await commitCompanyMetric(key, name, field, el.value);
+    var shown;
+    if (res.ok) shown = res.value;
+    else { var fresh = findCompanyEntry(key); shown = fresh ? fresh.roll[METRIC_ROLL_KEY[field]] : ""; }
+    el.value = el === document.activeElement && isReviewMetric(field) ? shown : metricDisplay(field, shown);
+    if (inDrawer) refreshCompanyDrawer();
+  });
+  document.addEventListener("focusin", function (e) {
+    var f = e.target.getAttribute && e.target.getAttribute("data-cometric");
+    if (f && isReviewMetric(f)) e.target.value = stripCommas(e.target.value);
+  });
+  document.addEventListener("focusout", function (e) {
+    var f = e.target.getAttribute && e.target.getAttribute("data-cometric");
+    if (f && isReviewMetric(f)) e.target.value = formatWithCommas(e.target.value);
+  });
+
+  // + Add company
+  var addcoScrim = document.getElementById("addco-scrim");
+  var addcoModal = document.getElementById("addco-modal");
+  var addcoInput = document.getElementById("addco-name");
+  function openAddCompany() {
+    addcoInput.value = "";
+    addcoScrim.classList.add("open");
+    addcoModal.classList.add("open");
+    addcoModal.setAttribute("aria-hidden", "false");
+    addcoInput.focus();
+  }
+  function closeAddCompany() {
+    addcoScrim.classList.remove("open");
+    addcoModal.classList.remove("open");
+    addcoModal.setAttribute("aria-hidden", "true");
+  }
+  async function confirmAddCompany() {
+    var name = addcoInput.value.trim();
+    if (!name) { addcoInput.focus(); return; }
+    var key = companyKey(name);
+    closeAddCompany();
+    var existing = findCompanyEntry(key);
+    if (existing) {
+      // Same name means same company (they're matched by name), so continuing opens the
+      // one that's already there rather than making a second copy.
+      if (!(await askConfirm("A company named “" + existing.name + "” already exists. Do you want to continue?", "Continue"))) return;
+      openCompanyDrawer(existing.key);
+      return;
+    }
+    var rec = ensureCompanyRec(key, name);
+    rec.manual = true;
+    saveCompany(rec, true);
+    renderTable();
+    openCompanyDrawer(key);
+  }
+  document.getElementById("add-company").addEventListener("click", openAddCompany);
+  document.getElementById("addco-cancel").addEventListener("click", closeAddCompany);
+  addcoScrim.addEventListener("click", closeAddCompany);
+  document.getElementById("addco-confirm").addEventListener("click", confirmAddCompany);
+  addcoInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); confirmAddCompany(); } });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && addcoModal.classList.contains("open")) closeAddCompany();
+  });
+
+  // Renaming — only for companies added by hand with no job attached (everyone else takes
+  // its name from its jobs/contacts, so the name is edited there).
+  var COMPANY_OWN_FIELDS = ["myRating", "linkedin", "companyUrl", "generalNotes", "recommendPercent", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount"];
+  function deleteCompanyFromDb(id) {
+    if (companyWriteTimers[id]) { clearTimeout(companyWriteTimers[id]); delete companyWriteTimers[id]; delete pendingCompanyWrites[id]; }
+    if (!companiesCol) return;
+    companiesCol.doc(id).delete().catch(function () { /* local copy is already gone */ });
+  }
+  function retargetStandaloneContacts(oldKey, newName) {
+    state.contacts.forEach(function (c) {
+      if (!c.jobId && companyKey(c.company) === oldKey) { c.company = newName; saveContact(c, false); }
+    });
+  }
+  function mergeCompanyInto(rec, target) {
+    COMPANY_OWN_FIELDS.forEach(function (f) {
+      if (blankText(rec[f])) return;
+      if (f === "generalNotes") {
+        if (blankText(target[f])) target[f] = rec[f];
+        else if (target[f].indexOf(rec[f]) === -1) target[f] = target[f] + "\n\n" + rec[f];
+      } else if (blankText(target[f])) target[f] = rec[f];
+    });
+    retargetStandaloneContacts(rec.key, target.name);
+    state.companies = state.companies.filter(function (c) { return c !== rec; });
+    localSaveCompanies();
+    deleteCompanyFromDb(rec.id);
+    saveCompany(target, true);
+  }
+  async function renameActiveCompany() {
+    var input = $co("co-name");
+    var e = currentCompanyEntry();
+    var rec = e.rec;
+    if (!rec || !rec.manual || e.jobs.length) { input.value = e.name; return; }
+    var newName = input.value.trim();
+    if (!newName) { input.value = e.name; return; }
+    var oldKey = rec.key, newKey = companyKey(newName);
+    if (newKey === oldKey) {
+      if (rec.name !== newName) { rec.name = newName; coActiveName = newName; saveCompany(rec, true); refreshCompanyDrawer(); retargetStandaloneContacts(oldKey, newName); }
+      return;
+    }
+    var other = findCompanyEntry(newKey);
+    if (other) {
+      if (!(await askConfirm("A company named “" + other.name + "” already exists. Do you want to continue?", "Continue"))) { input.value = e.name; return; }
+      var target = ensureCompanyRec(other.key, other.name);
+      mergeCompanyInto(rec, target);
+      openCompanyDrawer(other.key);
+      return;
+    }
+    var nr = blankCompany(newName);
+    nr.manual = true;
+    nr.createdAt = rec.createdAt;
+    COMPANY_OWN_FIELDS.forEach(function (f) { nr[f] = rec[f] === undefined ? "" : rec[f]; });
+    state.companies = state.companies.filter(function (c) { return c !== rec; });
+    state.companies.push(nr);
+    localSaveCompanies();
+    deleteCompanyFromDb(rec.id);
+    saveCompany(nr, true);
+    retargetStandaloneContacts(oldKey, newName);
+    openCompanyDrawer(newKey);
+  }
+  document.getElementById("co-name").addEventListener("change", renameActiveCompany);
+  document.getElementById("co-delete").addEventListener("click", async function () {
+    var e = coActiveKey && currentCompanyEntry();
+    if (!e || !e.rec || !e.rec.manual || e.jobs.length || e.contacts.length) return;
+    if (!(await askConfirm("Delete this company? This can't be undone.", "Delete"))) return;
+    var rec = e.rec;
+    state.companies = state.companies.filter(function (c) { return c !== rec; });
+    localSaveCompanies();
+    deleteCompanyFromDb(rec.id);
+    closeCompanyDrawer();
   });
 
   // ---------- Confirm dialog ----------
