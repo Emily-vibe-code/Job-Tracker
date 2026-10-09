@@ -4128,6 +4128,26 @@
     if (e && await deleteCompanyEntry(e)) closeCompanyDrawer();
   });
 
+
+  // Typing a company name on a contact (the Contacts tab's Company cell or the contact
+  // drawer's Company field) makes that company a real, stored one — same as adding it on
+  // the Companies tab — unless a company or job with that name already exists. Done when the
+  // field is committed rather than on each keystroke, so half-typed names never become companies.
+  function ensureCompanyFromName(name) {
+    var key = companyKey(name);
+    if (!key) return;
+    if (findCompanyRec(key) || state.jobs.some(function (j) { return companyKey(j.company) === key; })) return;
+    var rec = ensureCompanyRec(key, String(name).trim());
+    rec.manual = true;
+    saveCompany(rec, true);
+    renderStats();
+  }
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (!el.getAttribute) return;
+    if (el.getAttribute("data-cfield") === "company" || el.id === "cd-company") ensureCompanyFromName(el.value);
+  });
+
   // ---------- Confirm dialog ----------
   // A custom modal standing in for window.confirm(), which returns false without
   // showing anything inside this sandboxed artifact frame — the same class of issue
