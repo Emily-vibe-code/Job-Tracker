@@ -882,6 +882,34 @@
 
   .bookmarklet-hint { color: var(--ink-faint); font-size: 0.72rem; }
 
+
+  /* ---------- Companies tab / slide-out ---------- */
+  .ro-value {
+    font-size: 0.86rem;
+    border: 1px solid var(--border);
+    background: var(--surface-sunken);
+    color: var(--ink);
+    border-radius: 7px;
+    padding: 8px 10px;
+    min-height: 36px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-sizing: border-box;
+    text-align: left;
+  }
+  .ro-value.empty { color: var(--ink-faint); }
+  .field-note { font-size: 0.76rem; color: var(--ink-faint); margin: 10px 0 0; }
+  .drawer-head .titles .co-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); padding: 2px 4px; }
+  .drawer-head .titles .co-sub { font-size: 0.88rem; font-weight: 500; color: var(--ink-muted); padding: 0 4px; }
+  .co-job-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .co-job-row:last-child { border-bottom: none; }
+  .co-job-row .link-btn { font-size: 0.86rem; }
+  .co-note { margin-top: 10px; }
+  .co-note-label { font-size: 0.72rem; color: var(--ink-faint); font-weight: 500; margin-bottom: 4px; }
+  .co-add-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .co-add-row select { font: inherit; font-size: 0.82rem; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 7px 8px; max-width: 55%; }
+  .co-add-row .ghost-btn { flex: 1; }
+
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -902,7 +930,7 @@
   <div class="global-search">
     <div class="search-field">
       <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M18 18L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input type="text" id="search-input" placeholder="Search all jobs and contacts by company, title, or name">
+      <input type="text" id="search-input" placeholder="Search jobs, contacts and companies by company, title, or name">
       <button type="button" id="search-clear" aria-label="Clear search">✕</button>
     </div>
   </div>
@@ -913,6 +941,7 @@
     <button class="tab" role="tab" data-stage="interviewing" aria-selected="false">Interviewing <span class="count" id="count-interviewing">0</span></button>
     <button class="tab" role="tab" data-stage="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
     <button class="tab" role="tab" data-stage="contacts" aria-selected="false">Contacts <span class="count" id="count-contacts">0</span></button>
+    <button class="tab" role="tab" data-stage="companies" aria-selected="false">Companies <span class="count" id="count-companies">0</span></button>
   </nav>
 
   <div class="sheet">
@@ -959,6 +988,7 @@
         <div class="field"><label>Excitement</label><div class="stars-cell" id="d-excitement-stars"></div></div>
         <div class="field"><label for="d-reviewPercent">G Rating (out of 5)</label><input type="number" id="d-reviewPercent" min="0" max="5" step="0.1"></div>
         <div class="field"><label for="d-reviewCount">G Reviews</label><input type="text" inputmode="numeric" id="d-reviewCount"></div>
+        <div class="field"><label for="d-recommendPercent">Recommend (%)</label><input type="number" id="d-recommendPercent" min="0" max="100" step="1" placeholder="%"></div>
         <div class="field"><label for="d-indeedRating">I Ratings (out of 5)</label><input type="number" id="d-indeedRating" min="0" max="5" step="0.1"></div>
         <div class="field"><label for="d-indeedReviewCount">I Reviews</label><input type="text" inputmode="numeric" id="d-indeedReviewCount"></div>
         <div class="field"><label for="d-postedSalary">Posted salary</label><input type="text" id="d-postedSalary" placeholder="e.g. $110k – $130k"></div>
@@ -1070,6 +1100,74 @@
   </div>
 </aside>
 
+<div class="scrim" id="co-scrim"></div>
+<aside class="drawer" id="co-drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="titles">
+      <div class="co-title" id="co-title"></div>
+      <div class="co-sub" id="co-sub"></div>
+    </div>
+    <button class="icon-btn" id="co-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="section">
+      <p class="section-title">Company details</p>
+      <div class="field-grid">
+        <div class="field"><label>My rating</label><div class="stars-cell" id="co-myRating-stars"></div></div>
+        <div class="field"><label>Recommend</label><div class="ro-value" id="co-recommend"></div></div>
+        <div class="field"><label>Contacts</label><div class="ro-value" id="co-contactCount"></div></div>
+        <div class="field"><label>G Rating</label><div class="ro-value" id="co-gRating"></div></div>
+        <div class="field"><label>G Reviews</label><div class="ro-value" id="co-gReviews"></div></div>
+        <div class="field"><label>Follow-up (latest)</label><div class="ro-value" id="co-lastFollowup"></div></div>
+        <div class="field"><label>I Ratings</label><div class="ro-value" id="co-iRating"></div></div>
+        <div class="field"><label>I Reviews</label><div class="ro-value" id="co-iReviews"></div></div>
+        <div class="field"><label>Applied (latest)</label><div class="ro-value" id="co-lastApplied"></div></div>
+        <div class="field"><label>Interview (latest)</label><div class="ro-value" id="co-lastInterview"></div></div>
+        <div class="field span-2"><label for="co-linkedin">LinkedIn</label>
+          <div class="url-input-row"><a class="icon-btn" id="co-linkedin-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="co-linkedin" placeholder="https://linkedin.com/company/..."></div>
+        </div>
+        <div class="field span-2"><label for="co-companyUrl">Company URL</label>
+          <div class="url-input-row"><a class="icon-btn" id="co-companyUrl-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="co-companyUrl" placeholder="https://"></div>
+        </div>
+        <div class="field span-2"><label>PTO</label><div class="ro-value" id="co-pto"></div></div>
+        <div class="field span-2"><label>Medical</label><div class="ro-value" id="co-medical"></div></div>
+      </div>
+      <p class="field-note">Ratings, dates, PTO and Medical are rolled up from this company's jobs and contacts — edit them on the job. Where jobs differ, every entry is shown.</p>
+    </div>
+
+    <div class="section">
+      <p class="section-title">General notes</p>
+      <p class="section-subtitle">Anything worth remembering about the company as a whole</p>
+      <textarea id="co-generalNotes" style="width:100%; min-height:100px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Culture, values, or anything else worth remembering"></textarea>
+      <div id="co-job-notes"></div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Jobs</p>
+      <div id="co-jobs-list"></div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Contacts</p>
+      <div class="card-list" id="co-contacts-list"></div>
+      <button class="ghost-btn" id="co-add-contact" type="button" style="margin-top:8px;">+ Add contact</button>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Follow-ups</p>
+      <div class="card-list" id="co-followups-list"></div>
+      <div class="co-add-row">
+        <select id="co-followup-job" aria-label="Log the follow-up against this job"></select>
+        <button class="ghost-btn" id="co-add-followup" type="button">+ Add follow-up</button>
+      </div>
+      <p class="field-note" id="co-followup-hint" style="display:none;">Follow-ups are logged against a job — add a job for this company first.</p>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <span class="stage-badge stage-applied">Company</span>
+  </div>
+</aside>
+
 <div class="scrim" id="paste-scrim"></div>
 <div class="paste-modal" id="paste-modal" aria-hidden="true" role="dialog" aria-labelledby="paste-modal-title">
   <h2 id="paste-modal-title">Paste from bookmarklet</h2>
@@ -1097,7 +1195,7 @@
 
   var STORAGE_KEY = "jobTrackerData.v1";
   var COLWIDTH_KEY = "jobTrackerColWidths.v1";
-  var state = { activeStage: "jobs", activeId: null, jobs: [], contacts: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
+  var state = { activeStage: "jobs", activeId: null, jobs: [], contacts: [], companies: [], search: "", sortKey: null, sortDir: "asc", colWidths: {} };
 
   function uid() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -1118,7 +1216,7 @@
   // only flushPendingWrites()/flushPendingContactWrites() finishing does — so the pending/
   // in-flight checks are what actually close the "edit, close, get reverted" race.
   function isSyncSensitive() {
-    return !!(state.activeId || cdActiveId || isEditingInline() || hasPendingJobWrites() || hasPendingContactWrites());
+    return !!(state.activeId || cdActiveId || coActiveKey || isEditingInline() || hasPendingJobWrites() || hasPendingContactWrites() || hasPendingCompanyWrites());
   }
 
   function loadColWidths() {
@@ -1466,6 +1564,7 @@
     }
     jobsCol = dbApi.collection("jobs");
     contactsCol = dbApi.collection("contacts");
+    companiesCol = dbApi.collection("companies");
     try {
       var snap = await jobsCol.orderBy("createdAt").get();
       // If a drawer is already open by the time this resolves (e.g. the viewer opened
@@ -1490,6 +1589,16 @@
         renderTable();
       } else if (cSnap.empty && state.contacts.length) {
         state.contacts.forEach(function (c) { saveContact(c, true); });
+      }
+    } catch (e) { /* keep whatever loaded from localStorage */ }
+    try {
+      var coSnap = await companiesCol.orderBy("createdAt").get();
+      if (!coSnap.empty && !isSyncSensitive()) {
+        mergeCompaniesFromSnapshot(coSnap.docs.map(function (d) { return normalizeCompany(d.data()); }));
+        localSaveCompanies();
+        renderTable();
+      } else if (coSnap.empty && state.companies.length) {
+        state.companies.forEach(function (c) { saveCompany(c, true); });
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
     migrateEmbeddedContacts();
@@ -1517,6 +1626,15 @@
       setSyncStatus("off", "Sync paused — changes are saved on this device");
     });
 
+    companiesCol.orderBy("createdAt").onSnapshot(function (snap) {
+      if (isSyncSensitive()) return;
+      mergeCompaniesFromSnapshot(snap.docs.map(function (d) { return normalizeCompany(d.data()); }));
+      localSaveCompanies();
+      renderTable();
+    }, function () {
+      setSyncStatus("off", "Sync paused — changes are saved on this device");
+    });
+
     setSyncStatus("on", "Synced to your account");
   }
 
@@ -1534,7 +1652,7 @@
   }
 
   async function exportBackup() {
-    var payload = JSON.stringify({ exportedAt: new Date().toISOString(), jobs: state.jobs }, null, 2);
+    var payload = JSON.stringify({ exportedAt: new Date().toISOString(), jobs: state.jobs, contacts: state.contacts, companies: state.companies }, null, 2);
     var filename = "job-tracker-backup-" + todayStr() + ".json";
     var originalLabel = exportBtn.textContent;
 
@@ -1743,7 +1861,7 @@
     return {
       id: uid(), stage: "jobs", createdAt: Date.now(), updatedAt: Date.now(),
       date: "", position: "", company: "", excitement: "",
-      reviewPercent: "", reviewCount: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
+      reviewPercent: "", reviewCount: "", recommendPercent: "", indeedRating: "", indeedReviewCount: "", postedSalary: "", salaryAsk: "",
       location: "Remote", pto: "", medical: "",
       dateApplied: "", whereApplied: "", interviewing: false, followUpDue: "", followUpBasis: "",
       dateRejected: "", rejectionReason: "", dealbreakers: "",
@@ -1926,6 +2044,7 @@
       job({ stage: "rejected", company: "Lucerne Publishing", position: "Product Owner", excitement: "2", reviewPercent: "2.8", reviewCount: "540", postedSalary: "$120k - $135k", location: "Hybrid", date: d(-30), dateRejected: d(-22), rejectionReason: "Pass", dealbreakers: "Required 4 days on-site; compensation below range." }),
       job({ stage: "rejected", company: "Humongous Insurance", position: "Technical Product Owner", excitement: "3", reviewPercent: "3.4", reviewCount: "4300", postedSalary: "$130k - $145k", location: "Remote", date: d(-33), dateApplied: d(-29), dateRejected: d(-15), rejectionReason: "Withdrawn", dealbreakers: "Role scope changed after first interview." })
     ];
+    jobs.forEach(function (j) { if (j.reviewPercent) j.recommendPercent = String(Math.round(40 + parseFloat(j.reviewPercent) * 10.5)); });
     var byCo = {};
     jobs.forEach(function (j) { byCo[j.company] = j; });
     function contact(o) {
@@ -1944,8 +2063,206 @@
     localSaveContacts();
   }
 
+
+  // ---------- Companies ----------
+  // A company isn't entered on its own: it's every distinct company name found on a job or
+  // a contact, rolled up into one row (see buildCompanyIndex). Only what doesn't live on a
+  // job is stored per company — My rating, its LinkedIn page, Company URL and its own
+  // General notes — in a small `companies` collection with the same sync / merge-on-write
+  // handling as jobs and contacts. Nothing on a job is ever rewritten from here: free text
+  // that differs between jobs (PTO, Medical, General notes) is shown side by side.
+  var COMPANIES_STORAGE_KEY = "jobTrackerCompanies.v1";
+  var companiesCol = null;
+  var companyWriteTimers = {};
+  var pendingCompanyWrites = {};
+  var inFlightCompanyWrites = {};
+  var coActiveKey = null;
+  var coActiveName = "";
+
+  var COMPANY_SUFFIX_RE = /\b(inc|llc|ltd|corp|corporation|plc|gmbh)\b/g;
+  // "Acme", "ACME" and "Acme, Inc." are the same company; so are spellings differing only
+  // in spacing or punctuation.
+  function companyKey(name) {
+    var raw = String(name || "").toLowerCase().trim();
+    var k = raw.replace(/&/g, " and ").replace(/[.,'’"()]/g, " ").replace(COMPANY_SUFFIX_RE, " ").replace(/\s+/g, " ").trim();
+    return k || raw;
+  }
+  function companySlug(key) {
+    var slug = key.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (/^[a-z0-9 ]+$/.test(key) && slug) return slug;
+    var h = 5381;
+    for (var i = 0; i < key.length; i++) h = ((h * 33) ^ key.charCodeAt(i)) >>> 0;
+    return (slug || "c") + "-" + h.toString(36);
+  }
+  function blankCompany(name) {
+    var key = companyKey(name);
+    return { id: companySlug(key), key: key, name: String(name || "").trim(), createdAt: Date.now(), updatedAt: Date.now(),
+      myRating: "", linkedin: "", companyUrl: "", generalNotes: "" };
+  }
+  function normalizeCompany(data) {
+    var c = blankCompany((data && data.name) || "");
+    Object.keys(c).forEach(function (k) { if (data && data[k] !== undefined) c[k] = data[k]; });
+    if (data && data.id) c.id = data.id;
+    return JSON.parse(JSON.stringify(c));
+  }
+  function loadCompanies() {
+    try {
+      var raw = localStorage.getItem(COMPANIES_STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.companies)) return parsed.companies;
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return [];
+  }
+  function localSaveCompanies() {
+    try { localStorage.setItem(COMPANIES_STORAGE_KEY, JSON.stringify({ companies: state.companies })); } catch (e) { /* in-memory only for this session */ }
+  }
+  function findCompanyRec(key) {
+    for (var i = 0; i < state.companies.length; i++) if (state.companies[i].key === key) return state.companies[i];
+    return null;
+  }
+  // Creates the stored record the first time something company-level is entered for a name.
+  function ensureCompanyRec(key, name) {
+    var rec = findCompanyRec(key);
+    if (!rec) { rec = blankCompany(name || key); rec.key = key; state.companies.push(rec); }
+    return rec;
+  }
+  function mergeCompaniesFromSnapshot(remote) {
+    var byId = {};
+    state.companies.forEach(function (c) { byId[c.id] = c; });
+    remote.forEach(function (rc) {
+      var chosen = newerRecord(rc, byId[rc.id]);
+      if (chosen === rc) syncedBase["k:" + rc.id] = JSON.parse(JSON.stringify(rc));
+      byId[rc.id] = chosen;
+    });
+    state.companies = Object.keys(byId).map(function (id) { return byId[id]; });
+  }
+  function saveCompany(rec, immediate) {
+    rec.updatedAt = Date.now();
+    localSaveCompanies();
+    if (!companiesCol || !rec) return;
+    var id = rec.id;
+    if (companyWriteTimers[id]) { clearTimeout(companyWriteTimers[id]); delete companyWriteTimers[id]; }
+    var body = JSON.parse(JSON.stringify(rec));
+    var key = "k:" + id;
+    var seq = writeSeq[key] = (writeSeq[key] || 0) + 1;
+    var doWrite = function () {
+      delete companyWriteTimers[id];
+      delete pendingCompanyWrites[id];
+      var stamp = inFlightCompanyWrites[id] = Date.now();
+      mergedSet(companiesCol, id, key, body, seq)
+        .catch(function () { setSyncStatus("off", "Sync paused — changes are saved on this device"); })
+        .finally(function () { if (inFlightCompanyWrites[id] === stamp) delete inFlightCompanyWrites[id]; });
+    };
+    if (immediate) { doWrite(); }
+    else { pendingCompanyWrites[id] = doWrite; companyWriteTimers[id] = setTimeout(doWrite, 500); }
+  }
+  function flushPendingCompanyWrites() {
+    Object.keys(pendingCompanyWrites).forEach(function (id) {
+      var fn = pendingCompanyWrites[id];
+      clearTimeout(companyWriteTimers[id]);
+      delete companyWriteTimers[id];
+      delete pendingCompanyWrites[id];
+      fn();
+    });
+  }
+  function hasPendingCompanyWrites() {
+    if (Object.keys(companyWriteTimers).length > 0) return true;
+    return Object.keys(inFlightCompanyWrites).some(function (id) { return Date.now() - inFlightCompanyWrites[id] < STALE_WRITE_MS; });
+  }
+
+  // Which company a contact belongs to: its linked job's company while that job exists
+  // (syncContactCompany keeps the snapshot equal to it), otherwise the snapshot itself.
+  function contactCompanyName(c) {
+    var job = c.jobId ? findJob(c.jobId) : null;
+    return job ? (job.company || "") : (c.company || "");
+  }
+  function blankText(v) { return v === undefined || v === null || String(v).trim() === ""; }
+  function latestDate(dates) {
+    var best = "";
+    dates.forEach(function (d) { if (/^\d{4}-\d{2}-\d{2}$/.test(d || "") && d > best) best = d; });
+    return best;
+  }
+  // The job whose values stand in for the company for a group of related fields (e.g. G Rating
+  // + G Reviews): the most recently touched job that has any of them filled in. Picking the
+  // group from one job keeps a rating from being paired with another job's review count.
+  function pickJobGroup(jobs, keys) {
+    var best = null;
+    jobs.forEach(function (j) {
+      if (keys.every(function (k) { return blankText(j[k]); })) return;
+      if (!best || (j.updatedAt || 0) > (best.updatedAt || 0)) best = j;
+    });
+    return best;
+  }
+  // Every distinct non-blank text a company's jobs hold for a field, each with the jobs
+  // that carry it — so differing entries are all kept, never one picked over another.
+  function textItems(jobs, key) {
+    var items = [], seen = {};
+    jobs.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); }).forEach(function (j) {
+      var t = String(j[key] === undefined || j[key] === null ? "" : j[key]).trim();
+      if (!t) return;
+      var k = t.toLowerCase();
+      if (!seen[k]) { seen[k] = { text: t, labels: [] }; items.push(seen[k]); }
+      seen[k].labels.push(j.position || "Untitled job");
+    });
+    return items;
+  }
+  function computeCompanyRollup(e) {
+    var r = {};
+    function grp(keys, names) {
+      var j = pickJobGroup(e.jobs, keys);
+      keys.forEach(function (k, i) { r[names[i]] = j && !blankText(j[k]) ? String(j[k]).trim() : ""; });
+    }
+    grp(["reviewPercent", "reviewCount"], ["gRating", "gReviews"]);
+    grp(["indeedRating", "indeedReviewCount"], ["iRating", "iReviews"]);
+    grp(["recommendPercent"], ["recommend"]);
+    var allFollow = [], allInterview = [];
+    e.jobs.forEach(function (j) {
+      (Array.isArray(j.followups) ? j.followups : []).forEach(function (f) { allFollow.push(f && f.date); });
+      (Array.isArray(j.interviews) ? j.interviews : []).forEach(function (f) { allInterview.push(f && f.date); });
+    });
+    r.lastFollowup = latestDate(allFollow);
+    r.lastInterview = latestDate(allInterview);
+    r.lastApplied = latestDate(e.jobs.map(function (j) { return j.dateApplied; }));
+    r.contactCount = e.contacts.length;
+    r.linkedin = (e.rec && e.rec.linkedin) || "";
+    var urls = textItems(e.jobs, "companyUrl");
+    r.companyUrl = (e.rec && e.rec.companyUrl) || (urls.length ? urls[0].text : "");
+    r.ptoItems = textItems(e.jobs, "pto");
+    r.medicalItems = textItems(e.jobs, "medical");
+    r.pto = r.ptoItems.map(function (i) { return i.text; }).join(" · ");
+    r.medical = r.medicalItems.map(function (i) { return i.text; }).join(" · ");
+    e.roll = r;
+    return e;
+  }
+  function buildCompanyIndex() {
+    var map = {};
+    function entry(name) {
+      var key = companyKey(name);
+      if (!key) return null;
+      return map[key] || (map[key] = { key: key, name: String(name).trim(), jobs: [], contacts: [], rec: null });
+    }
+    state.jobs.forEach(function (j) { var e = entry(j.company); if (e) e.jobs.push(j); });
+    state.contacts.forEach(function (c) { var e = entry(contactCompanyName(c)); if (e) e.contacts.push(c); });
+    state.companies.forEach(function (r) {
+      if (map[r.key]) map[r.key].rec = r;
+      else if (r.myRating || r.linkedin || r.companyUrl || r.generalNotes) {
+        map[r.key] = { key: r.key, name: r.name || r.key, jobs: [], contacts: [], rec: r };
+      }
+    });
+    return Object.keys(map).map(function (k) { return computeCompanyRollup(map[k]); });
+  }
+  function findCompanyEntry(key) {
+    var all = buildCompanyIndex();
+    for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
+    return null;
+  }
+  function companyMatchesQuery(e, q) { return (e.name || "").toLowerCase().indexOf(q) !== -1; }
+
   state.jobs = load();
   state.contacts = loadContacts();
+  state.companies = loadCompanies();
   if (!state.jobs.length && !state.contacts.length) seedDemoData();
   migrateEmbeddedContacts();
   migrateValuesNotes();
@@ -2019,6 +2336,7 @@
   var COL_COMPANY = { key: "company", label: "Company", type: "text", cls: "col-company", w: "150px" };
   var COL_RATING = { key: "reviewPercent", label: "G Rating", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
   var COL_REVIEWS = { key: "reviewCount", label: "G Reviews", type: "number", commaFormat: true, w: "100px" };
+  var COL_RECOMMEND = { key: "recommendPercent", label: "Recommend", type: "number", min: 0, max: 100, step: 1, w: "108px" };
   var COL_INDEED_RATING = { key: "indeedRating", label: "I Ratings", type: "number", min: 0, max: 5, step: 0.1, w: "116px" };
   var COL_INDEED_REVIEWS = { key: "indeedReviewCount", label: "I Reviews", type: "number", commaFormat: true, w: "100px" };
   var COL_POSTED_SALARY = { key: "postedSalary", label: "Posted salary", type: "text", w: "128px" };
@@ -2042,13 +2360,13 @@
   var COL_REJECTION_REASON = { key: "rejectionReason", label: "Reason", type: "select", options: REJECTION_REASONS, selectCls: "reason-select", w: "130px" };
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
-  var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
   var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE];
-  var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
   var DATE_COL_KEYS = ["date", "dateApplied", "dateRejected", "followUpDue"];
@@ -2121,9 +2439,10 @@
     return (contact.name || "").toLowerCase().indexOf(q) !== -1 ||
       (job && (job.company || "").toLowerCase().indexOf(q) !== -1);
   }
-  var SEARCH_STAGE_ORDER = ["jobs", "applied", "interviewing", "rejected", "contacts"];
+  var SEARCH_STAGE_ORDER = ["jobs", "applied", "interviewing", "rejected", "contacts", "companies"];
   function stageHasMatch(stage, q) {
     if (stage === "contacts") return state.contacts.some(function (c) { return contactMatchesQuery(c, q); });
+    if (stage === "companies") return buildCompanyIndex().some(function (e) { return companyMatchesQuery(e, q); });
     return state.jobs.some(function (j) { return j.stage === stage && jobMatchesQuery(j, q); });
   }
   // Stays on the current tab if it already has a match (so typing doesn't yank you
@@ -2195,7 +2514,7 @@
     var table = document.getElementById("table");
     // Contacts tab columns share some names with job columns (e.g. "company") — store
     // their widths under a separate namespace so resizing one tab never touches the other.
-    var storageKey = state.activeStage === "contacts" ? "contact_" + key : key;
+    var storageKey = state.activeStage === "contacts" ? "contact_" + key : (state.activeStage === "companies" ? "co_" + key : key);
     resizeDrag = {
       key: storageKey,
       col: col,
@@ -2361,7 +2680,9 @@
     var q = searching ? state.search.trim().toLowerCase() : "";
     function setCount(id, stage, total) {
       var el = document.getElementById(id);
-      var matchCount = stage === "contacts"
+      var matchCount = stage === "companies"
+        ? buildCompanyIndex().filter(function (e) { return companyMatchesQuery(e, q); }).length
+        : stage === "contacts"
         ? getAllContacts().filter(function (c) { return contactMatchesQuery(c, q); }).length
         : state.jobs.filter(function (j) { return j.stage === stage && jobMatchesQuery(j, q); }).length;
       el.textContent = searching ? matchCount : total;
@@ -2372,6 +2693,7 @@
     setCount("count-interviewing", "interviewing", interviewing);
     setCount("count-rejected", "rejected", rejected);
     setCount("count-contacts", "contacts", getAllContacts().length);
+    setCount("count-companies", "companies", buildCompanyIndex().length);
   }
 
   function cellHtml(job, col) {
@@ -2463,10 +2785,11 @@
     renderStats();
     var stage = state.activeStage;
 
-    document.getElementById("add-row").style.display = stage === "contacts" ? "none" : "flex";
+    document.getElementById("add-row").style.display = (stage === "contacts" || stage === "companies") ? "none" : "flex";
     document.getElementById("contacts-add-row").style.display = stage === "contacts" ? "flex" : "none";
 
     if (stage === "contacts") { renderContactsTab(); return; }
+    if (stage === "companies") { renderCompaniesTab(); return; }
 
     var cols = colsForStage(stage);
     var rows = state.jobs.filter(function (j) { return j.stage === stage; });
@@ -2648,9 +2971,16 @@
       // matching the job's own name). Not linked — including standalone contacts, and
       // ones whose job got deleted — it's a plain editable field instead, so there's
       // always a way to type a company name in, not just display one from elsewhere.
+      // Clicking a company name jumps to that company on the Companies tab (a job with no
+      // company name keeps the old behavior of opening the job record).
+      var companyInput = '<input type="text" value="' + esc(c.company) + '" placeholder="Company name" data-cid="' + c.id + '" data-cfield="company"' + NO_ASSIST_ATTRS + '>';
       var companyCell = job
-        ? '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.company || job.position || "Untitled job") + "</button>"
-        : '<input type="text" value="' + esc(c.company) + '" placeholder="Company name" data-cid="' + c.id + '" data-cfield="company"' + NO_ASSIST_ATTRS + '>';
+        ? (job.company
+          ? '<button type="button" class="link-btn" data-action="open-company" data-company="' + esc(job.company) + '" title="Open company">' + escapeHtml(job.company) + "</button>"
+          : '<button type="button" class="link-btn" data-action="open-job" data-job-id="' + job.id + '">' + escapeHtml(job.position || "Untitled job") + "</button>")
+        : (c.company
+          ? '<div class="linkedin-inner"><button type="button" class="icon-btn" data-action="open-company" title="Open company" aria-label="Open company">↗</button>' + companyInput + "</div>"
+          : companyInput);
       var linkedinOpen = c.linkedin
         ? '<a href="' + escapeHtml(normalizeUrl(c.linkedin)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open LinkedIn" aria-label="Open LinkedIn">↗</a>'
         : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
@@ -2670,6 +3000,12 @@
   document.getElementById("tbody").addEventListener("click", function (e) {
     var openJobBtn = e.target.closest('button[data-action="open-job"]');
     if (openJobBtn) { openDrawer(openJobBtn.getAttribute("data-job-id")); return; }
+    var openCoBtn = e.target.closest('button[data-action="open-company"]');
+    if (openCoBtn) {
+      var coInput = openCoBtn.parentElement.querySelector('input[data-cfield="company"]');
+      goToCompany(coInput ? coInput.value : openCoBtn.getAttribute("data-company"));
+      return;
+    }
     var viewContactBtn = e.target.closest('button[data-action="view-contact"]');
     if (viewContactBtn) { openContactDrawer(viewContactBtn.getAttribute("data-cid")); return; }
     var delContactBtn = e.target.closest('button[data-action="delete-contact"]');
@@ -2689,6 +3025,7 @@
   document.getElementById("tbody").addEventListener("focusout", function (e) {
     flushPendingWrites();
     flushPendingContactWrites();
+    flushPendingCompanyWrites();
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
     if (field && COMMA_FIELDS.indexOf(field) !== -1) {
       e.target.value = formatWithCommas(e.target.value);
@@ -2938,7 +3275,7 @@
   var drawer = document.getElementById("drawer");
   var scrim = document.getElementById("scrim");
 
-  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
+  var SIMPLE_FIELDS = ["date", "location", "reviewPercent", "reviewCount", "recommendPercent", "indeedRating", "indeedReviewCount", "postedSalary", "salaryAsk",
     "pto", "medical", "companyUrl", "postingUrl", "linkedinPosting", "description", "values", "dateApplied", "whereApplied", "followUpDue",
     "dateRejected", "rejectionReason", "dealbreakers"];
 
@@ -3064,7 +3401,7 @@
     if (job) {
       cdCompanyInput.style.display = "none";
       cdCompanyLink.style.display = "";
-      cdCompanyLink.textContent = (job.company || job.position || "Untitled job") + " — open job record ↗";
+      cdCompanyLink.textContent = job.company ? (job.company + " — open company ↗") : ((job.position || "Untitled job") + " — open job record ↗");
       cdCompanyLink.style.cursor = "pointer";
       cdCompanyLink.style.color = "var(--accent)";
     } else {
@@ -3097,6 +3434,8 @@
     var c = findContact(cdActiveId);
     if (!c || !c.jobId) return;
     var jobId = c.jobId;
+    var linked = findJob(jobId);
+    if (linked && linked.company) { goToCompany(linked.company); return; }
     closeContactDrawer();
     openDrawer(jobId);
   });
@@ -3127,6 +3466,408 @@
     localSaveContacts();
     deleteContactFromDb(cid);
     closeContactDrawer();
+  });
+
+
+  // ---------- Companies tab ----------
+  var COMPANY_COLS = [
+    { key: "name", label: "Company", type: "name", w: "180px", get: function (e) { return e.name; } },
+    { key: "myRating", label: "My rating", type: "stars", w: "130px", num: true, get: function (e) { return e.rec ? e.rec.myRating : ""; } },
+    { key: "recommend", label: "Recommend", type: "pct", w: "108px", num: true, get: function (e) { return e.roll.recommend; } },
+    { key: "gRating", label: "G Rating", type: "num", w: "96px", num: true, get: function (e) { return e.roll.gRating; } },
+    { key: "gReviews", label: "G Reviews", type: "reviews", w: "100px", num: true, get: function (e) { return e.roll.gReviews; } },
+    { key: "iRating", label: "I Ratings", type: "num", w: "96px", num: true, get: function (e) { return e.roll.iRating; } },
+    { key: "iReviews", label: "I Reviews", type: "reviews", w: "100px", num: true, get: function (e) { return e.roll.iReviews; } },
+    { key: "linkedin", label: "LinkedIn", type: "url", w: "170px", get: function (e) { return e.roll.linkedin; } },
+    { key: "contactCount", label: "Contacts", type: "count", w: "88px", num: true, get: function (e) { return e.roll.contactCount; } },
+    { key: "lastFollowup", label: "Follow-up", type: "date", w: "100px", get: function (e) { return e.roll.lastFollowup; } },
+    { key: "lastApplied", label: "Applied", type: "date", w: "100px", get: function (e) { return e.roll.lastApplied; } },
+    { key: "lastInterview", label: "Interview", type: "date", w: "100px", get: function (e) { return e.roll.lastInterview; } },
+    { key: "companyUrl", label: "Company URL", type: "url", w: "190px", get: function (e) { return e.roll.companyUrl; } },
+    { key: "pto", label: "PTO", type: "text", w: "150px", get: function (e) { return e.roll.pto; } },
+    { key: "medical", label: "Medical", type: "text", w: "170px", get: function (e) { return e.roll.medical; } }
+  ];
+
+  function companyActionsInnerHtml(key) {
+    return '<button class="icon-btn" data-action="view-company" data-ckey="' + escapeHtml(key) + '" title="Open company" aria-label="Open company">⤢</button>';
+  }
+
+  function companyCellInfo(e, col) {
+    var v = col.get(e);
+    if (v === undefined || v === null) v = "";
+    switch (col.type) {
+      case "name":
+        return { cls: "cell-text", html: '<button type="button" class="link-btn" data-action="open-company-key" data-ckey="' + escapeHtml(e.key) + '">' + escapeHtml(e.name) + "</button>" };
+      case "stars":
+        return { cls: "", html: starsCellHtml(v, 'data-co="' + escapeHtml(e.key) + '"') };
+      case "url":
+        var open = v
+          ? '<a href="' + escapeHtml(normalizeUrl(v)) + '" target="_blank" rel="noopener" class="icon-btn" title="Open" aria-label="Open link">↗</a>'
+          : '<span class="icon-btn" style="opacity:0.35; pointer-events:none;" aria-hidden="true">↗</span>';
+        return { cls: "linkedin-cell", html: '<div class="linkedin-inner">' + open + '<input type="text" value="' + escapeHtml(v) + '" placeholder="https://" data-co="' +
+          escapeHtml(e.key) + '" data-cofield="' + col.key + '"' + NO_ASSIST_ATTRS + "></div>" };
+      default:
+        var text = col.type === "pct" ? (v !== "" ? v + "%" : "") :
+          col.type === "reviews" ? formatWithCommas(v) :
+          col.type === "date" ? formatDateShort(v) : String(v);
+        return { cls: "cell-text", html: '<span title="' + escapeHtml(col.type === "text" ? v : text) + '">' + escapeHtml(text) + "</span>" };
+    }
+  }
+
+  function compareCompanies(a, b, col, dir) {
+    var av = col.get(a), bv = col.get(b), cmp;
+    if (col.num) {
+      var an = av === "" || av === null || av === undefined || isNaN(av) ? null : parseFloat(av);
+      var bn = bv === "" || bv === null || bv === undefined || isNaN(bv) ? null : parseFloat(bv);
+      if (an === null && bn === null) cmp = 0;
+      else if (an === null) return 1;
+      else if (bn === null) return -1;
+      else cmp = an - bn;
+    } else {
+      var as = String(av || "").toLowerCase(), bs = String(bv || "").toLowerCase();
+      if (as === "" && bs === "") cmp = 0;
+      else if (as === "") return 1;
+      else if (bs === "") return -1;
+      else cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    }
+    return dir === "desc" ? -cmp : cmp;
+  }
+
+  function renderCompaniesTab() {
+    var entries = buildCompanyIndex();
+    entries.sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; });
+
+    var searching = !!state.search.trim();
+    if (searching) {
+      var q = state.search.trim().toLowerCase();
+      entries = entries.filter(function (e) { return companyMatchesQuery(e, q); });
+    }
+    var sortCol = state.sortKey ? COMPANY_COLS.filter(function (c) { return c.key === state.sortKey; })[0] : null;
+    if (sortCol) entries = entries.slice().sort(function (a, b) { return compareCompanies(a, b, sortCol, state.sortDir); });
+
+    var actionsW = measureRowActionsWidth("companies", companyActionsInnerHtml("x"));
+    var colgroup = document.getElementById("colgroup");
+    var totalW = actionsW;
+    colgroup.innerHTML = '<col data-key="actions" style="width:' + actionsW + 'px">' + COMPANY_COLS.map(function (c) {
+      var w = state.colWidths["co_" + c.key] || parseInt(c.w, 10);
+      totalW += w;
+      return '<col data-key="' + c.key + '" style="width:' + w + 'px">';
+    }).join("");
+    document.getElementById("table").style.width = Math.max(totalW, 980) + "px";
+
+    document.getElementById("thead-row").innerHTML = '<th class="actions-col">Actions</th>' + COMPANY_COLS.map(function (c) {
+      var active = sortCol && sortCol.key === c.key;
+      var arrow = active ? (state.sortDir === "asc" ? "▲" : "▼") : "▲";
+      return '<th class="sortable' + (active ? " active" : "") + '" data-key="' + c.key + '" tabindex="0">' +
+        c.label + '<span class="arrow">' + arrow + "</span>" +
+        '<span class="col-resizer" data-key="' + c.key + '"></span></th>';
+    }).join("");
+    document.getElementById("sort-hint").textContent = sortCol ? ("Sorted by " + sortCol.label + " " + (state.sortDir === "asc" ? "↑" : "↓")) : "";
+
+    var tbody = document.getElementById("tbody");
+    if (!entries.length) {
+      var heading = searching ? "No companies match “" + escapeHtml(state.search.trim()) + "”" : "No companies yet";
+      var body = searching ? "Try a different spelling, or clear the search." : "Companies appear here automatically from the jobs and contacts you add.";
+      tbody.innerHTML = '<tr><td colspan="' + (COMPANY_COLS.length + 1) + '"><div class="empty"><h2>' + heading + "</h2><p>" + body + "</p></div></td></tr>";
+      return;
+    }
+    tbody.innerHTML = entries.map(function (e) {
+      return '<tr data-ckey="' + escapeHtml(e.key) + '"><td class="actions-col"><div class="row-actions">' + companyActionsInnerHtml(e.key) + "</div></td>" +
+        COMPANY_COLS.map(function (c) { var i = companyCellInfo(e, c); return '<td class="' + i.cls + '">' + i.html + "</td>"; }).join("") + "</tr>";
+    }).join("");
+  }
+
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var btn = e.target.closest('button[data-action="open-company-key"], button[data-action="view-company"]');
+    if (btn) { openCompanyDrawer(btn.getAttribute("data-ckey")); return; }
+    var star = e.target.closest(".star-btn[data-co]");
+    if (star) {
+      var key = star.getAttribute("data-co");
+      var e2 = findCompanyEntry(key);
+      var rec = ensureCompanyRec(key, e2 ? e2.name : key);
+      var clicked = parseInt(star.getAttribute("data-star"), 10);
+      var current = parseInt(rec.myRating, 10) || 0;
+      rec.myRating = clicked === current ? "" : String(clicked);
+      saveCompany(rec, true);
+      var cell = star.closest(".stars-cell");
+      if (cell) cell.outerHTML = starsCellHtml(rec.myRating, 'data-co="' + escapeHtml(key) + '"');
+    }
+  });
+  document.getElementById("tbody").addEventListener("dblclick", function (e) {
+    if (state.activeStage !== "companies" || e.target.closest(".actions-col") || e.target.closest("input")) return;
+    var row = e.target.closest("tr[data-ckey]");
+    if (row) openCompanyDrawer(row.getAttribute("data-ckey"));
+  });
+  document.getElementById("tbody").addEventListener("input", function (e) {
+    var el = e.target;
+    var key = el.getAttribute("data-co"), field = el.getAttribute("data-cofield");
+    if (!key || !field) return;
+    var entry = findCompanyEntry(key);
+    var rec = ensureCompanyRec(key, entry ? entry.name : key);
+    rec[field] = el.value;
+    saveCompany(rec, false);
+    var openLink = el.closest("td").querySelector("a.icon-btn, span.icon-btn");
+    if (openLink && openLink.tagName === "A") {
+      if (el.value) { openLink.style.opacity = ""; openLink.style.pointerEvents = ""; openLink.href = normalizeUrl(el.value); }
+      else { openLink.style.opacity = "0.35"; openLink.style.pointerEvents = "none"; }
+    }
+  });
+
+  // ---------- Company slide-out ----------
+  var coDrawer = document.getElementById("co-drawer");
+  var coScrim = document.getElementById("co-scrim");
+  function $co(id) { return document.getElementById(id); }
+  function setRo(id, text) {
+    var el = $co(id);
+    el.textContent = text || "—";
+    el.classList.toggle("empty", !text);
+  }
+  function formatDateFull(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? m[2] + "/" + m[3] + "/" + m[1] : "";
+  }
+  function multiText(items) {
+    if (!items.length) return "";
+    if (items.length === 1) return items[0].text;
+    return items.map(function (i) { return i.text + "  — " + i.labels.join(", "); }).join("\n");
+  }
+
+  // The read-only parts, jobs list, and star rating — safe to redraw while typing elsewhere
+  // in the slide-out (never touches the editable inputs or the contact/follow-up lists).
+  function fillCompanyStatic(e) {
+    var r = e.roll;
+    $co("co-title").textContent = e.name;
+    $co("co-sub").textContent = e.jobs.length + (e.jobs.length === 1 ? " job" : " jobs") + " · " + e.contacts.length + (e.contacts.length === 1 ? " contact" : " contacts");
+    $co("co-myRating-stars").innerHTML = starButtonsHtml(e.rec ? e.rec.myRating : "", 'data-co="1"');
+    setRo("co-recommend", r.recommend !== "" ? r.recommend + "%" : "");
+    setRo("co-gRating", r.gRating);
+    setRo("co-gReviews", formatWithCommas(r.gReviews));
+    setRo("co-iRating", r.iRating);
+    setRo("co-iReviews", formatWithCommas(r.iReviews));
+    setRo("co-contactCount", String(r.contactCount));
+    setRo("co-lastFollowup", formatDateFull(r.lastFollowup));
+    setRo("co-lastApplied", formatDateFull(r.lastApplied));
+    setRo("co-lastInterview", formatDateFull(r.lastInterview));
+    setRo("co-pto", multiText(r.ptoItems));
+    setRo("co-medical", multiText(r.medicalItems));
+
+    var jobsEl = $co("co-jobs-list");
+    jobsEl.innerHTML = e.jobs.length ? e.jobs.map(function (j) {
+      return '<div class="co-job-row"><button type="button" class="link-btn" data-action="co-open-job" data-id="' + j.id + '">' +
+        escapeHtml(j.position || "Untitled job") + '</button><span class="stage-badge stage-' + j.stage + '">' + escapeHtml(STAGE_LABEL[j.stage] || j.stage) + "</span></div>";
+    }).join("") : '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No jobs for this company yet.</p>';
+
+    var notes = [];
+    e.jobs.forEach(function (j) {
+      var t = [j.values, j.notes].filter(function (x) { return !blankText(x); }).join("\n\n");
+      if (t) notes.push('<div class="co-note"><div class="co-note-label">From job: ' + escapeHtml(j.position || "Untitled job") + '</div><div class="ro-value">' + escapeHtml(t) + "</div></div>");
+    });
+    $co("co-job-notes").innerHTML = notes.join("");
+  }
+
+  function contactCardHtml(c) {
+    return '<div class="card" data-cid="' + c.id + '">' +
+      '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
+      '<div class="card-grid">' +
+      field2("Name", "text", c.name, c.id, "name") +
+      field2("Connection", "text", c.connection, c.id, "connection") +
+      field2("Phone", "tel", c.phone, c.id, "phone") +
+      field2("Email", "email", c.email, c.id, "email") +
+      field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
+      field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
+      '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
+      String(c.notes || "").replace(/</g, "&lt;") + '</textarea></div>' +
+      "</div></div>";
+  }
+  function renderCompanyContacts(e) {
+    var list = $co("co-contacts-list");
+    list.innerHTML = e.contacts.length ? e.contacts.map(contactCardHtml).join("") :
+      '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
+  }
+  function companyFollowupRows(e) {
+    var rows = [];
+    e.jobs.forEach(function (j) {
+      (Array.isArray(j.followups) ? j.followups : []).forEach(function (f, i) { rows.push({ job: j, entry: f, n: i + 1 }); });
+    });
+    // Newest first; an entry with no date yet (just added) sorts to the top where it's visible.
+    rows.sort(function (a, b) { var ad = a.entry.date || "9999", bd = b.entry.date || "9999"; return ad < bd ? 1 : ad > bd ? -1 : 0; });
+    return rows;
+  }
+  function renderCompanyFollowups(e) {
+    var list = $co("co-followups-list");
+    var rows = companyFollowupRows(e);
+    list.innerHTML = rows.length ? rows.map(function (r) {
+      return '<div class="card entry-card">' +
+        '<button class="icon-btn rm" data-action="rm-co-followup" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" aria-label="Remove entry">✕</button>' +
+        '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">Follow-up ' + r.n + " — " + escapeHtml(r.job.position || "Untitled job") + "</label>" +
+        '<input type="date" value="' + (r.entry.date || "") + '" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" data-efield="date"></div>' +
+        '<textarea placeholder="Notes" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" data-efield="notes">' + String(r.entry.notes || "").replace(/</g, "&lt;") + "</textarea></div>";
+    }).join("") : '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">None logged yet.</p>';
+    // Follow-ups are logged against a job; with several jobs the viewer picks which one.
+    var sel = $co("co-followup-job");
+    var jobs = e.jobs.slice().sort(function (a, b) {
+      var ad = a.dateApplied || "", bd = b.dateApplied || "";
+      return ad !== bd ? (ad < bd ? 1 : -1) : (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    var keep = sel.value;
+    sel.innerHTML = jobs.map(function (j) { return '<option value="' + j.id + '">' + escapeHtml((j.position || "Untitled job") + " (" + (STAGE_LABEL[j.stage] || j.stage) + ")") + "</option>"; }).join("");
+    if (keep && jobs.some(function (j) { return j.id === keep; })) sel.value = keep;
+    sel.style.display = jobs.length > 1 ? "" : "none";
+    $co("co-add-followup").style.display = jobs.length ? "" : "none";
+    $co("co-followup-hint").style.display = jobs.length ? "none" : "";
+  }
+
+  function currentCompanyEntry() {
+    return findCompanyEntry(coActiveKey) || computeCompanyRollup({ key: coActiveKey, name: coActiveName, jobs: [], contacts: [], rec: findCompanyRec(coActiveKey) });
+  }
+  function refreshCompanyDrawer() { if (coActiveKey) fillCompanyStatic(currentCompanyEntry()); }
+
+  function openCompanyDrawer(key) {
+    var e = findCompanyEntry(key);
+    if (!e) return;
+    coActiveKey = e.key;
+    coActiveName = e.name;
+    $co("co-linkedin").value = (e.rec && e.rec.linkedin) || "";
+    $co("co-companyUrl").value = (e.rec && e.rec.companyUrl) || e.roll.companyUrl || "";
+    $co("co-generalNotes").value = (e.rec && e.rec.generalNotes) || "";
+    urlFieldSyncs["co-linkedin"]();
+    urlFieldSyncs["co-companyUrl"]();
+    fillCompanyStatic(e);
+    renderCompanyContacts(e);
+    renderCompanyFollowups(e);
+    coDrawer.classList.add("open");
+    coDrawer.setAttribute("aria-hidden", "false");
+    coScrim.classList.add("open");
+  }
+  function closeCompanyDrawer() {
+    coDrawer.classList.remove("open");
+    coDrawer.setAttribute("aria-hidden", "true");
+    coScrim.classList.remove("open");
+    flushPendingCompanyWrites();
+    flushPendingWrites();
+    flushPendingContactWrites();
+    coActiveKey = null;
+    renderTable();
+  }
+  // Jump to a company from anywhere (e.g. a contact's Company link): switch to the
+  // Companies tab and open its slide-out.
+  function goToCompany(name) {
+    var key = companyKey(name);
+    if (!key) return;
+    if (cdActiveId) closeContactDrawer();
+    selectTab("companies");
+    state.sortKey = null;
+    renderTable();
+    openCompanyDrawer(key);
+  }
+
+  $co("co-close").addEventListener("click", closeCompanyDrawer);
+  coScrim.addEventListener("click", closeCompanyDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && coDrawer.classList.contains("open")) closeCompanyDrawer();
+  });
+
+  function saveActiveCompanyField(field, value) {
+    if (!coActiveKey) return;
+    var rec = ensureCompanyRec(coActiveKey, coActiveName);
+    rec[field] = value;
+    saveCompany(rec, false);
+  }
+  $co("co-linkedin").addEventListener("input", function (e) { saveActiveCompanyField("linkedin", e.target.value); });
+  $co("co-companyUrl").addEventListener("input", function (e) { saveActiveCompanyField("companyUrl", e.target.value); });
+  $co("co-generalNotes").addEventListener("input", function (e) { saveActiveCompanyField("generalNotes", e.target.value); });
+  [$co("co-linkedin"), $co("co-companyUrl"), $co("co-generalNotes")].forEach(function (el) {
+    el.addEventListener("blur", flushPendingCompanyWrites);
+  });
+
+  coDrawer.addEventListener("click", function (e) {
+    var star = e.target.closest(".star-btn");
+    if (star && coActiveKey) {
+      var rec = ensureCompanyRec(coActiveKey, coActiveName);
+      var clicked = parseInt(star.getAttribute("data-star"), 10);
+      var current = parseInt(rec.myRating, 10) || 0;
+      rec.myRating = clicked === current ? "" : String(clicked);
+      saveCompany(rec, true);
+      $co("co-myRating-stars").innerHTML = starButtonsHtml(rec.myRating, 'data-co="1"');
+      return;
+    }
+    var jobBtn = e.target.closest('button[data-action="co-open-job"]');
+    if (jobBtn) {
+      var id = jobBtn.getAttribute("data-id");
+      closeCompanyDrawer();
+      openDrawer(id);
+    }
+  });
+
+  // Contacts in the company slide-out (same cards and fields as a job's Contacts section).
+  $co("co-add-contact").addEventListener("click", function () {
+    if (!coActiveKey) return;
+    var c = blankContact();
+    c.company = coActiveName;
+    state.contacts.push(c);
+    saveContact(c, true);
+    var e = currentCompanyEntry();
+    renderCompanyContacts(e);
+    refreshCompanyDrawer();
+    var card = document.querySelector("#co-contacts-list .card:last-child");
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  $co("co-contacts-list").addEventListener("input", function (e) {
+    var el = e.target;
+    var cid = el.getAttribute("data-cid"), field = el.getAttribute("data-cfield");
+    if (!cid || !field) return;
+    var c = findContact(cid);
+    if (!c) return;
+    if (field === "phone") el.value = formatPhoneNumber(el.value);
+    c[field] = el.value;
+    saveContact(c, false);
+  });
+  $co("co-contacts-list").addEventListener("click", async function (e) {
+    var btn = e.target.closest('button[data-action="rm-contact"]');
+    if (!btn) return;
+    if (!(await askConfirm("Remove this contact? This can't be undone.", "Remove"))) return;
+    var cid = btn.getAttribute("data-cid");
+    state.contacts = state.contacts.filter(function (c) { return c.id !== cid; });
+    localSaveContacts();
+    deleteContactFromDb(cid);
+    renderCompanyContacts(currentCompanyEntry());
+    refreshCompanyDrawer();
+  });
+
+  // Follow-ups in the company slide-out: every follow-up logged on any of the company's jobs.
+  $co("co-add-followup").addEventListener("click", function () {
+    var e = currentCompanyEntry();
+    if (!e.jobs.length) return;
+    var sel = $co("co-followup-job");
+    var job = findJob(sel.value) || e.jobs[0];
+    if (!Array.isArray(job.followups)) job.followups = [];
+    job.followups.push({ id: uid(), date: "", notes: "" });
+    save(job, true);
+    var e2 = currentCompanyEntry();
+    renderCompanyFollowups(e2);
+    refreshCompanyDrawer();
+  });
+  $co("co-followups-list").addEventListener("input", function (e) {
+    var el = e.target;
+    var jid = el.getAttribute("data-jid"), eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
+    if (!jid || !eid || !field) return;
+    var job = findJob(jid);
+    var entry = job && (job.followups || []).filter(function (x) { return x.id === eid; })[0];
+    if (!entry) return;
+    entry[field] = el.value;
+    save(job);
+    if (field === "date") refreshCompanyDrawer();
+  });
+  $co("co-followups-list").addEventListener("click", async function (e) {
+    var btn = e.target.closest('button[data-action="rm-co-followup"]');
+    if (!btn) return;
+    if (!(await askConfirm("Remove this follow-up? This can't be undone.", "Remove"))) return;
+    var job = findJob(btn.getAttribute("data-jid"));
+    if (!job) return;
+    job.followups = (job.followups || []).filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
+    save(job, true);
+    renderCompanyFollowups(currentCompanyEntry());
+    refreshCompanyDrawer();
   });
 
   // ---------- Confirm dialog ----------
@@ -3286,20 +4027,7 @@
     if (!jobContacts.length) {
       list.innerHTML = '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
     } else {
-      list.innerHTML = jobContacts.map(function (c) {
-        return '<div class="card" data-cid="' + c.id + '">' +
-          '<button class="icon-btn rm" data-action="rm-contact" data-cid="' + c.id + '" aria-label="Remove contact">✕</button>' +
-          '<div class="card-grid">' +
-          field2("Name", "text", c.name, c.id, "name") +
-          field2("Connection", "text", c.connection, c.id, "connection") +
-          field2("Phone", "tel", c.phone, c.id, "phone") +
-          field2("Email", "email", c.email, c.id, "email") +
-          field2("LinkedIn", "text", c.linkedin, c.id, "linkedin") +
-          field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
-          '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
-          String(c.notes || "").replace(/</g, "&lt;") + '</textarea></div>' +
-          "</div></div>";
-      }).join("");
+      list.innerHTML = jobContacts.map(contactCardHtml).join("");
     }
   }
 
@@ -3431,6 +4159,7 @@
     if (isSyncSensitive()) return;
     if (e.key === STORAGE_KEY) { state.jobs = load(); renderTable(); }
     else if (e.key === CONTACTS_STORAGE_KEY) { state.contacts = loadContacts(); renderTable(); }
+    else if (e.key === COMPANIES_STORAGE_KEY) { state.companies = loadCompanies(); renderTable(); }
   });
 
   // A cell left mid-edit with nothing ever blurring it (e.g. the viewer switched tabs
@@ -3461,6 +4190,8 @@
   wireUrlField("d-postingUrl", "d-postingUrl-open");
   wireUrlField("d-linkedinPosting", "d-linkedinPosting-open");
   wireUrlField("cd-linkedin", "cd-linkedin-open");
+  wireUrlField("co-linkedin", "co-linkedin-open");
+  wireUrlField("co-companyUrl", "co-companyUrl-open");
 
   // Pressing Enter in any field commits it (blurs, so the value saves and the field is
   // free to pick up external updates again) instead of leaving the viewer wondering
