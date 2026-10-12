@@ -1085,6 +1085,12 @@
       <button class="ghost-btn" id="add-followup" type="button" style="margin-top:8px;">+ Add follow-up</button>
     </div>
 
+    <div class="section">
+      <p class="section-title">Replies</p>
+      <div class="card-list" id="replies-list"></div>
+      <button class="ghost-btn" id="add-reply" type="button" style="margin-top:8px;">+ Add reply</button>
+    </div>
+
   </div>
   <div class="drawer-foot">
     <span class="stage-badge" id="d-stage-badge">Jobs</span>
@@ -1124,6 +1130,11 @@
       <p class="section-title">Notes</p>
       <textarea id="cd-notes" style="width:100%; min-height:120px; font:inherit; font-size:0.86rem; line-height:1.5; border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:7px; padding:10px;" placeholder="Anything worth remembering about this contact"></textarea>
     </div>
+    <div class="section">
+      <p class="section-title">Replies</p>
+      <div class="card-list" id="cd-replies-list"></div>
+      <button class="ghost-btn" id="cd-add-reply" type="button" style="margin-top:8px;">+ Add reply</button>
+    </div>
   </div>
   <div class="drawer-foot">
     <span class="stage-badge stage-applied">Contact</span>
@@ -1154,6 +1165,7 @@
         <div class="field"><label>I Reviews</label><input type="text" inputmode="numeric" data-cometric="indeedReviewCount" id="co-iReviews"></div>
         <div class="field"><label>Applied (latest)</label><div class="ro-value" id="co-lastApplied"></div></div>
         <div class="field"><label>Interview (latest)</label><div class="ro-value" id="co-lastInterview"></div></div>
+        <div class="field"><label>Reply (latest)</label><div class="ro-value" id="co-lastReply"></div></div>
         <div class="field span-2"><label for="co-linkedin">LinkedIn</label>
           <div class="url-input-row"><a class="icon-btn" id="co-linkedin-open" href="#" target="_blank" rel="noopener" title="Open" aria-label="Open link">↗</a><input type="text" id="co-linkedin" placeholder="https://linkedin.com/company/..."></div>
         </div>
@@ -1192,6 +1204,16 @@
         <button class="ghost-btn" id="co-add-followup" type="button">+ Add follow-up</button>
       </div>
       <p class="field-note" id="co-followup-hint" style="display:none;">Follow-ups are logged against a job — add a job for this company first.</p>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Replies</p>
+      <div class="card-list" id="co-replies-list"></div>
+      <div class="co-add-row">
+        <select id="co-reply-job" aria-label="Log the reply against this job"></select>
+        <button class="ghost-btn" id="co-add-reply" type="button">+ Add reply</button>
+      </div>
+      <p class="field-note" id="co-reply-hint" style="display:none;">Replies are logged against a job — add a job for this company first. Replies from a contact are logged on the contact above.</p>
     </div>
   </div>
   <div class="drawer-foot">
@@ -1304,6 +1326,7 @@
     if (!Array.isArray(job.contacts)) job.contacts = [];
     if (!Array.isArray(job.interviews)) job.interviews = [];
     if (!Array.isArray(job.followups)) job.followups = [];
+    if (!Array.isArray(job.replies)) job.replies = [];
     return job;
   }
 
@@ -1365,6 +1388,7 @@
     if (!Array.isArray(j.contacts)) j.contacts = [];
     if (!Array.isArray(j.interviews)) j.interviews = [];
     if (!Array.isArray(j.followups)) j.followups = [];
+    if (!Array.isArray(j.replies)) j.replies = [];
     // The db capability hands back snapshot data that's frozen (non-extensible), to stop
     // callers from mutating its cache. Fields copied straight from `data` above (like these
     // arrays) carry that freeze with them, so `.push()` on job.interviews/followups/contacts
@@ -1928,7 +1952,7 @@
       dateApplied: "", whereApplied: "", interviewing: false, followUpDue: "", followUpBasis: "",
       dateRejected: "", rejectionReason: "", dealbreakers: "",
       companyUrl: "", postingUrl: "", linkedinPosting: "", description: "", values: "", notes: "",
-      contacts: [], interviews: [], followups: []
+      contacts: [], interviews: [], followups: [], replies: []
     };
   }
 
@@ -1947,7 +1971,7 @@
       id: uid(), jobId: null, createdAt: Date.now(), updatedAt: Date.now(),
       name: "", connection: "", businessPhone: "", cellPhone: "", businessEmail: "", personalEmail: "",
       // Legacy single fields — only kept so migrateContactFields() can move old values over.
-      phone: "", email: "", linkedin: "", dateOfContact: "", notes: "",
+      phone: "", email: "", linkedin: "", dateOfContact: "", notes: "", replies: [],
       // Snapshot of the linked job's company name. Kept in sync with the live job
       // (see syncContactCompany) while it exists, so the name survives if that job is
       // ever deleted instead of just vanishing along with it.
@@ -2055,6 +2079,7 @@
     Object.keys(c).forEach(function (k) {
       if (data && data[k] !== undefined) c[k] = data[k];
     });
+    if (!Array.isArray(c.replies)) c.replies = [];
     if (data && data.id) c.id = data.id;
     // Same frozen-snapshot issue as normalizeJob() — clone so nothing non-extensible
     // survives onto the working copy.
@@ -2316,6 +2341,10 @@
       (Array.isArray(j.followups) ? j.followups : []).forEach(function (f) { allFollow.push(f && f.date); });
       (Array.isArray(j.interviews) ? j.interviews : []).forEach(function (f) { allInterview.push(f && f.date); });
     });
+    var allReplies = [];
+    e.jobs.forEach(function (j) { (Array.isArray(j.replies) ? j.replies : []).forEach(function (f) { allReplies.push(f && f.date); }); });
+    e.contacts.forEach(function (c) { (Array.isArray(c.replies) ? c.replies : []).forEach(function (f) { allReplies.push(f && f.date); }); });
+    r.lastReply = latestDate(allReplies);
     r.lastFollowup = latestDate(allFollow);
     r.lastInterview = latestDate(allInterview);
     r.lastApplied = latestDate(e.jobs.map(function (j) { return j.dateApplied; }));
@@ -2452,6 +2481,8 @@
   var COL_FOLLOWUP = { key: "followup_last", label: "Follow-up", type: "followup-date", w: "112px", sortable: false };
   // Next follow-up to do: auto-set to 7 days after the latest activity (see syncFollowUpDue),
   // still editable by hand. A plain date field, unlike Follow-up above which reflects the log.
+  // Same idea as Follow-up, for when a contact replied: shows the most recent reply date.
+  var COL_REPLY = { key: "reply_last", label: "Reply", type: "reply-date", w: "112px", sortable: false };
   var COL_FOLLOWUP_DUE = { key: "followUpDue", label: "Due", type: "date", w: "100px" };
   var COL_DATE_REJECTED = { key: "dateRejected", label: "Rejected", type: "date", w: "116px" };
   var REJECTION_REASONS = ["", "Rejected", "Withdrawn", "Ghosted", "Pass"];
@@ -2459,11 +2490,11 @@
   var COL_DEALBREAKERS = { key: "dealbreakers", label: "Dealbreakers", type: "text", w: "160px" };
 
   var COLS_JOBS = [COL_POSTED, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
-  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
+  var COLS_APPLIED = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_REPLY, COL_FOLLOWUP_DUE, COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   // The Interviewing tab additionally gets one dynamic "Interview"/"Interview N"
   // column per interview logged — built per-render in interviewCols(), then spliced
   // in between these two halves. See buildInterviewingCols().
-  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_FOLLOWUP_DUE];
+  var COLS_INTERVIEWING_HEAD = [COL_POSTED, COL_DATE_APPLIED, COL_FOLLOWUP, COL_REPLY, COL_FOLLOWUP_DUE];
   var COLS_INTERVIEWING_TAIL = [COL_COMPANY, COL_POSITION, COL_EXCITEMENT, COL_RATING, COL_REVIEWS, COL_RECOMMEND, COL_INDEED_RATING, COL_INDEED_REVIEWS, COL_POSTED_SALARY, COL_SALARY_ASK, COL_LOCATION, COL_PTO, COL_MEDICAL, COL_POSTING_URL];
   var COLS_REJECTED = [COL_POSTED, COL_DATE_REJECTED, COL_REJECTION_REASON, COL_DEALBREAKERS, COL_COMPANY, COL_POSITION, COL_POSTING_URL];
   var STAGE_LABEL = { jobs: "Jobs", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected" };
@@ -2822,6 +2853,11 @@
       var dateEsc = formatDateShort(entry ? entry.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
       return '<input type="text" value="' + dateEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
     }
+    if (col.type === "reply-date") {
+      var rp = lastReply(job);
+      var rpEsc = formatDateShort(rp ? rp.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      return '<input type="text" value="' + rpEsc + '" placeholder="—" data-id="' + job.id + '" data-field="' + col.key + '"' + NO_ASSIST_ATTRS + '>';
+    }
     if (col.type === "followup-date") {
       var fu = lastFollowup(job);
       var fuEsc = formatDateShort(fu ? fu.date : "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -2978,6 +3014,7 @@
     { key: "personalEmail", label: "Personal email", type: "email", w: "190px" },
     { key: "company", label: "Company", type: "link", w: "160px" },
     { key: "dateOfContact", label: "Date of contact", type: "date", w: "130px" },
+    { key: "reply_last", label: "Reply", type: "date", w: "130px" },
     { key: "linkedin", label: "LinkedIn", type: "url", w: "170px" }
   ];
 
@@ -3014,6 +3051,9 @@
       var bJob = b.jobId ? findJob(b.jobId) : null;
       av = aJob ? (aJob.company || "") : "";
       bv = bJob ? (bJob.company || "") : "";
+    } else if (key === "reply_last") {
+      var ar = lastReply(a), br = lastReply(b);
+      av = (ar && ar.date) || ""; bv = (br && br.date) || "";
     } else {
       av = a[key] || ""; bv = b[key] || "";
     }
@@ -3102,6 +3142,7 @@
         '<td><input type="email" value="' + esc(c.personalEmail) + '" data-cid="' + c.id + '" data-cfield="personalEmail"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="' + (job ? "cell-text" : "") + '">' + companyCell + "</td>" +
         '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
+        '<td><input type="date" value="' + esc((lastReply(c) || {}).date) + '" data-cid="' + c.id + '" data-cfield="reply_last"></td>' +
         '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
         "</tr>";
     }).join("");
@@ -3139,7 +3180,7 @@
     var field = e.target.getAttribute && e.target.getAttribute("data-field");
     if (field && COMMA_FIELDS.indexOf(field) !== -1) {
       e.target.value = formatWithCommas(e.target.value);
-    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field) || field === "followup_last")) {
+    } else if (field && (DATE_COL_KEYS.indexOf(field) !== -1 || /^interview_\d+$/.test(field) || field === "followup_last" || field === "reply_last")) {
       // Back to a plain text cell showing just month/day — the full value (year
       // included) is still whatever was just picked, it's just not displayed here.
       e.target.type = "text";
@@ -3170,6 +3211,12 @@
       e.target.type = "date";
       e.target.value = (entry && entry.date) || "";
       try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
+    } else if (field === "reply_last") {
+      var jobR = findJob(e.target.getAttribute("data-id"));
+      var rpl = jobR ? lastReply(jobR) : null;
+      e.target.type = "date";
+      e.target.value = (rpl && rpl.date) || "";
+      try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* unsupported browser — plain date input still works */ }
     } else if (field === "followup_last") {
       var id3 = e.target.getAttribute("data-id");
       var job3 = findJob(id3);
@@ -3187,7 +3234,8 @@
     var c = findContact(cid);
     if (!c) return;
     if (isPhoneField(field)) el.value = formatPhoneNumber(el.value);
-    c[field] = el.value;
+    if (field === "reply_last") setLastReplyDate(c, el.value);
+    else c[field] = el.value;
     saveContact(c, false);
     if (field === "linkedin") {
       var openLink = el.closest("td").querySelector("a.icon-btn");
@@ -3295,6 +3343,11 @@
     }
     if (field === "followup_last") {
       setLastFollowupDate(job, el.value);
+      save(job);
+      return;
+    }
+    if (field === "reply_last") {
+      setLastReplyDate(job, el.value);
       save(job);
       return;
     }
@@ -3444,6 +3497,7 @@
     renderContacts(job);
     renderEntries(job, "interviews", "interviews-list");
     renderEntries(job, "followups", "followups-list");
+    renderEntries(job, "replies", "replies-list");
 
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
@@ -3503,6 +3557,7 @@
       document.getElementById("cd-" + f).value = c[f] || "";
     });
     document.getElementById("cd-notes").value = c.notes || "";
+    renderCdReplies(c);
     urlFieldSyncs["cd-linkedin"]();
     var job = c.jobId ? findJob(c.jobId) : null;
     if (syncContactCompany(c)) saveContact(c, false);
@@ -3591,6 +3646,7 @@
     { key: "iReviews", label: "I Reviews", type: "metric", field: "indeedReviewCount", w: "100px", num: true, get: function (e) { return e.roll.iReviews; } },
     { key: "contactCount", label: "Contacts", type: "count", w: "88px", num: true, get: function (e) { return e.roll.contactCount; } },
     { key: "lastFollowup", label: "Follow-up", type: "date", w: "100px", get: function (e) { return e.roll.lastFollowup; } },
+    { key: "lastReply", label: "Reply", type: "date", w: "100px", get: function (e) { return e.roll.lastReply; } },
     { key: "lastApplied", label: "Applied", type: "date", w: "100px", get: function (e) { return e.roll.lastApplied; } },
     { key: "lastInterview", label: "Interview", type: "date", w: "100px", get: function (e) { return e.roll.lastInterview; } },
     { key: "linkedin", label: "LinkedIn", type: "url", w: "170px", get: function (e) { return e.roll.linkedin; } },
@@ -3771,6 +3827,7 @@
     });
     setRo("co-contactCount", String(r.contactCount));
     setRo("co-lastFollowup", formatDateFull(r.lastFollowup));
+    setRo("co-lastReply", formatDateFull(r.lastReply));
     setRo("co-lastApplied", formatDateFull(r.lastApplied));
     setRo("co-lastInterview", formatDateFull(r.lastInterview));
     setRo("co-pto", multiText(r.ptoItems));
@@ -3804,6 +3861,8 @@
       field2("Date of contact", "date", c.dateOfContact, c.id, "dateOfContact") +
       '<div class="field span-2"><label>Notes</label><textarea data-cid="' + c.id + '" data-cfield="notes" style="min-height:56px;">' +
       String(c.notes || "").replace(/</g, "&lt;") + '</textarea></div>' +
+      '<div style="grid-column:1 / -1;"><div class="co-note-label">Replies</div><div class="card-list">' + contactRepliesHtml(c) + "</div>" +
+      '<button class="ghost-btn" data-action="add-reply" data-cid="' + c.id + '" type="button" style="margin-top:6px;">+ Add reply</button></div>' +
       "</div></div>";
   }
   function renderCompanyContacts(e) {
@@ -3811,27 +3870,32 @@
     list.innerHTML = e.contacts.length ? e.contacts.map(contactCardHtml).join("") :
       '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">No contacts yet.</p>';
   }
-  function companyFollowupRows(e) {
+  var CO_ENTRY = {
+    followups: { list: "co-followups-list", sel: "co-followup-job", add: "co-add-followup", hint: "co-followup-hint", label: "Follow-up", noun: "follow-up" },
+    replies: { list: "co-replies-list", sel: "co-reply-job", add: "co-add-reply", hint: "co-reply-hint", label: "Reply", noun: "reply" }
+  };
+  function companyEntryRows(e, key) {
     var rows = [];
     e.jobs.forEach(function (j) {
-      (Array.isArray(j.followups) ? j.followups : []).forEach(function (f, i) { rows.push({ job: j, entry: f, n: i + 1 }); });
+      (Array.isArray(j[key]) ? j[key] : []).forEach(function (f, i) { rows.push({ job: j, entry: f, n: i + 1 }); });
     });
     // Newest first; an entry with no date yet (just added) sorts to the top where it's visible.
     rows.sort(function (a, b) { var ad = a.entry.date || "9999", bd = b.entry.date || "9999"; return ad < bd ? 1 : ad > bd ? -1 : 0; });
     return rows;
   }
-  function renderCompanyFollowups(e) {
-    var list = $co("co-followups-list");
-    var rows = companyFollowupRows(e);
+  // Follow-ups / replies are logged against a job; with several jobs the viewer picks which one.
+  function renderCompanyEntries(e, key) {
+    var cfg = CO_ENTRY[key];
+    var list = $co(cfg.list);
+    var rows = companyEntryRows(e, key);
     list.innerHTML = rows.length ? rows.map(function (r) {
       return '<div class="card entry-card">' +
-        '<button class="icon-btn rm" data-action="rm-co-followup" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" aria-label="Remove entry">✕</button>' +
-        '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">Follow-up ' + r.n + " — " + escapeHtml(r.job.position || "Untitled job") + "</label>" +
+        '<button class="icon-btn rm" data-action="rm-co-entry" data-key="' + key + '" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" aria-label="Remove entry">✕</button>' +
+        '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">' + cfg.label + " " + r.n + " — " + escapeHtml(r.job.position || "Untitled job") + "</label>" +
         '<input type="date" value="' + (r.entry.date || "") + '" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" data-efield="date"></div>' +
         '<textarea placeholder="Notes" data-jid="' + r.job.id + '" data-eid="' + r.entry.id + '" data-efield="notes">' + String(r.entry.notes || "").replace(/</g, "&lt;") + "</textarea></div>";
     }).join("") : '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">None logged yet.</p>';
-    // Follow-ups are logged against a job; with several jobs the viewer picks which one.
-    var sel = $co("co-followup-job");
+    var sel = $co(cfg.sel);
     var jobs = e.jobs.slice().sort(function (a, b) {
       var ad = a.dateApplied || "", bd = b.dateApplied || "";
       return ad !== bd ? (ad < bd ? 1 : -1) : (b.updatedAt || 0) - (a.updatedAt || 0);
@@ -3840,9 +3904,11 @@
     sel.innerHTML = jobs.map(function (j) { return '<option value="' + j.id + '">' + escapeHtml((j.position || "Untitled job") + " (" + (STAGE_LABEL[j.stage] || j.stage) + ")") + "</option>"; }).join("");
     if (keep && jobs.some(function (j) { return j.id === keep; })) sel.value = keep;
     sel.style.display = jobs.length > 1 ? "" : "none";
-    $co("co-add-followup").style.display = jobs.length ? "" : "none";
-    $co("co-followup-hint").style.display = jobs.length ? "none" : "";
+    $co(cfg.add).style.display = jobs.length ? "" : "none";
+    $co(cfg.hint).style.display = jobs.length ? "none" : "";
   }
+  function renderCompanyFollowups(e) { renderCompanyEntries(e, "followups"); }
+  function renderCompanyReplies(e) { renderCompanyEntries(e, "replies"); }
 
   function currentCompanyEntry() {
     return findCompanyEntry(coActiveKey) || computeCompanyRollup({ key: coActiveKey, name: coActiveName, jobs: [], contacts: [], rec: findCompanyRec(coActiveKey) });
@@ -3862,6 +3928,7 @@
     fillCompanyStatic(e);
     renderCompanyContacts(e);
     renderCompanyFollowups(e);
+    renderCompanyReplies(e);
     coDrawer.classList.add("open");
     coDrawer.setAttribute("aria-hidden", "false");
     coScrim.classList.add("open");
@@ -3961,41 +4028,44 @@
     refreshCompanyDrawer();
   });
 
-  // Follow-ups in the company slide-out: every follow-up logged on any of the company's jobs.
-  $co("co-add-followup").addEventListener("click", function () {
-    var e = currentCompanyEntry();
-    if (!e.jobs.length) return;
-    var sel = $co("co-followup-job");
-    var job = findJob(sel.value) || e.jobs[0];
-    if (!Array.isArray(job.followups)) job.followups = [];
-    job.followups.push({ id: uid(), date: "", notes: "" });
-    save(job, true);
-    var e2 = currentCompanyEntry();
-    renderCompanyFollowups(e2);
-    refreshCompanyDrawer();
-  });
-  $co("co-followups-list").addEventListener("input", function (e) {
-    var el = e.target;
-    var jid = el.getAttribute("data-jid"), eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
-    if (!jid || !eid || !field) return;
-    var job = findJob(jid);
-    var entry = job && (job.followups || []).filter(function (x) { return x.id === eid; })[0];
-    if (!entry) return;
-    entry[field] = el.value;
-    save(job);
-    if (field === "date") refreshCompanyDrawer();
-  });
-  $co("co-followups-list").addEventListener("click", async function (e) {
-    var btn = e.target.closest('button[data-action="rm-co-followup"]');
-    if (!btn) return;
-    if (!(await askConfirm("Remove this follow-up? This can't be undone.", "Remove"))) return;
-    var job = findJob(btn.getAttribute("data-jid"));
-    if (!job) return;
-    job.followups = (job.followups || []).filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
-    save(job, true);
-    renderCompanyFollowups(currentCompanyEntry());
-    refreshCompanyDrawer();
-  });
+  // Follow-ups and replies in the company slide-out: everything logged on any of the company's jobs.
+  function bindCompanyEntries(key) {
+    var cfg = CO_ENTRY[key];
+    $co(cfg.add).addEventListener("click", function () {
+      var e = currentCompanyEntry();
+      if (!e.jobs.length) return;
+      var job = findJob($co(cfg.sel).value) || e.jobs[0];
+      if (!Array.isArray(job[key])) job[key] = [];
+      job[key].push({ id: uid(), date: "", notes: "" });
+      save(job, true);
+      renderCompanyEntries(currentCompanyEntry(), key);
+      refreshCompanyDrawer();
+    });
+    $co(cfg.list).addEventListener("input", function (e) {
+      var el = e.target;
+      var jid = el.getAttribute("data-jid"), eid = el.getAttribute("data-eid"), field = el.getAttribute("data-efield");
+      if (!jid || !eid || !field) return;
+      var job = findJob(jid);
+      var entry = job && (job[key] || []).filter(function (x) { return x.id === eid; })[0];
+      if (!entry) return;
+      entry[field] = el.value;
+      save(job);
+      if (field === "date") refreshCompanyDrawer();
+    });
+    $co(cfg.list).addEventListener("click", async function (e) {
+      var btn = e.target.closest('button[data-action="rm-co-entry"]');
+      if (!btn) return;
+      if (!(await askConfirm("Remove this " + cfg.noun + "? This can't be undone.", "Remove"))) return;
+      var job = findJob(btn.getAttribute("data-jid"));
+      if (!job) return;
+      job[key] = (job[key] || []).filter(function (x) { return x.id !== btn.getAttribute("data-eid"); });
+      save(job, true);
+      renderCompanyEntries(currentCompanyEntry(), key);
+      refreshCompanyDrawer();
+    });
+  }
+  bindCompanyEntries("followups");
+  bindCompanyEntries("replies");
 
 
   // ---------- Company-level editing: add, rename, ratings ----------
@@ -4388,6 +4458,98 @@
     if (e.key === "Escape" && mergeModal.classList.contains("open")) closeMergeModal();
   });
 
+
+  // ---------- Replies ----------
+  // A reply is a dated note (when a contact replied, and what they said), logged like a
+  // follow-up. Jobs and contacts each keep their own list (job.replies / contact.replies);
+  // the Reply column shows the most recent date and edits that entry (or logs the first one).
+  function latestEntry(entries) {
+    var list = Array.isArray(entries) ? entries : [];
+    var best = null;
+    list.forEach(function (e) {
+      if (e && /^\d{4}-\d{2}-\d{2}$/.test(e.date || "") && (!best || e.date >= best.date)) best = e;
+    });
+    return best || (list.length ? list[list.length - 1] : null);
+  }
+  function lastReply(owner) { return latestEntry(owner.replies); }
+  function setLastReplyDate(owner, value) {
+    if (!Array.isArray(owner.replies)) owner.replies = [];
+    var t = latestEntry(owner.replies);
+    if (!t) owner.replies.push({ id: uid(), date: value, notes: "" });
+    else t.date = value;
+  }
+  function contactReplies(c) { if (!Array.isArray(c.replies)) c.replies = []; return c.replies; }
+  function replyEntryHtml(c, r, n) {
+    return '<div class="card entry-card">' +
+      '<button class="icon-btn rm" data-action="rm-reply" data-cid="' + c.id + '" data-reid="' + r.id + '" aria-label="Remove reply">✕</button>' +
+      '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">Reply ' + n + "</label>" +
+      '<input type="date" value="' + (r.date || "") + '" data-cid="' + c.id + '" data-reid="' + r.id + '" data-refield="date"></div>' +
+      '<textarea placeholder="Notes" data-cid="' + c.id + '" data-reid="' + r.id + '" data-refield="notes">' + String(r.notes || "").replace(/</g, "&lt;") + "</textarea></div>";
+  }
+  function contactRepliesHtml(c) {
+    var list = contactReplies(c);
+    return list.length ? list.map(function (r, i) { return replyEntryHtml(c, r, i + 1); }).join("") :
+      '<p style="color:var(--ink-faint); font-size:0.82rem; margin:0;">None logged yet.</p>';
+  }
+  // Wires a container holding contacts' reply entries (data-cid / data-reid) for editing,
+  // removing, and (via an "add-reply" button inside it) adding. onChange(c) re-draws the container.
+  function bindContactReplies(container, onChange, onDate) {
+    container.addEventListener("input", function (e) {
+      var el = e.target;
+      var cid = el.getAttribute("data-cid"), reid = el.getAttribute("data-reid"), field = el.getAttribute("data-refield");
+      if (!cid || !reid || !field) return;
+      var c = findContact(cid);
+      var entry = c && contactReplies(c).filter(function (x) { return x.id === reid; })[0];
+      if (!entry) return;
+      entry[field] = el.value;
+      saveContact(c, false);
+      if (field === "date" && onDate) onDate(c);
+    });
+    container.addEventListener("click", async function (e) {
+      var add = e.target.closest('button[data-action="add-reply"]');
+      if (add) {
+        var c0 = findContact(add.getAttribute("data-cid"));
+        if (!c0) return;
+        contactReplies(c0).push({ id: uid(), date: "", notes: "" });
+        saveContact(c0, true);
+        onChange(c0);
+        return;
+      }
+      var btn = e.target.closest('button[data-action="rm-reply"]');
+      if (!btn) return;
+      if (!(await askConfirm("Remove this reply? This can't be undone.", "Remove"))) return;
+      var c = findContact(btn.getAttribute("data-cid"));
+      if (!c) return;
+      c.replies = contactReplies(c).filter(function (x) { return x.id !== btn.getAttribute("data-reid"); });
+      saveContact(c, true);
+      onChange(c);
+    });
+  }
+
+  // Contact slide-out
+  function renderCdReplies(c) { document.getElementById("cd-replies-list").innerHTML = contactRepliesHtml(c); }
+  (function () {
+    var list = document.getElementById("cd-replies-list");
+    var redraw = renderCdReplies;
+    bindContactReplies(list, redraw);
+    document.getElementById("cd-add-reply").addEventListener("click", function () {
+      var c = findContact(cdActiveId);
+      if (!c) return;
+      contactReplies(c).push({ id: uid(), date: "", notes: "" });
+      saveContact(c, true);
+      redraw(c);
+    });
+  })();
+  // Contact cards inside a job's drawer and a company's slide-out
+  bindContactReplies(document.getElementById("contacts-list"), function () {
+    var job = findJob(state.activeId);
+    if (job) renderContacts(job);
+  });
+  bindContactReplies(document.getElementById("co-contacts-list"), function () {
+    renderCompanyContacts(currentCompanyEntry());
+    refreshCompanyDrawer();
+  }, function () { refreshCompanyDrawer(); });
+
   // ---------- Confirm dialog ----------
   // A custom modal standing in for window.confirm(), which returns false without
   // showing anything inside this sandboxed artifact frame — the same class of issue
@@ -4611,7 +4773,7 @@
       return '<div class="card entry-card" data-eid="' + e.id + '">' +
         '<button class="icon-btn rm" data-action="rm-entry" data-key="' + key + '" data-eid="' + e.id + '" aria-label="Remove entry">✕</button>' +
         '<div class="entry-head"><label style="font-size:0.72rem; color:var(--ink-faint); font-weight:500;">' +
-        (key === "interviews" ? "Interview " : "Follow-up ") + (idx + 1) + "</label>" +
+        ({ interviews: "Interview ", followups: "Follow-up ", replies: "Reply " }[key]) + (idx + 1) + "</label>" +
         '<input type="date" value="' + (e.date || "") + '" data-key="' + key + '" data-eid="' + e.id + '" data-efield="date"></div>' +
         '<textarea placeholder="Notes" data-key="' + key + '" data-eid="' + e.id + '" data-efield="notes">' + notesEsc + "</textarea>" +
         "</div>";
@@ -4662,7 +4824,7 @@
     list.addEventListener("click", async function (e) {
       var btn = e.target.closest('button[data-action="rm-entry"]');
       if (!btn) return;
-      var noun = key === "interviews" ? "interview" : "follow-up";
+      var noun = { interviews: "interview", followups: "follow-up", replies: "reply" }[key];
       if (!(await askConfirm("Remove this " + noun + "? This can't be undone.", "Remove"))) return;
       var job = findJob(state.activeId);
       if (!job) return;
@@ -4674,6 +4836,7 @@
 
   bindEntrySection("interviews", "interviews-list", "add-interview");
   bindEntrySection("followups", "followups-list", "add-followup");
+  bindEntrySection("replies", "replies-list", "add-reply");
 
   // Keep multiple tabs of this tracker (same browser, no cloud sync) from drifting apart.
   window.addEventListener("storage", function (e) {
