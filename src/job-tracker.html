@@ -3094,8 +3094,8 @@
         '<td><input type="email" value="' + esc(c.businessEmail) + '" data-cid="' + c.id + '" data-cfield="businessEmail"' + NO_ASSIST_ATTRS + "></td>" +
         '<td><input type="email" value="' + esc(c.personalEmail) + '" data-cid="' + c.id + '" data-cfield="personalEmail"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="' + (job ? "cell-text" : "") + '">' + companyCell + "</td>" +
-        '<td><input type="date" value="' + esc(c.dateOfContact) + '" data-cid="' + c.id + '" data-cfield="dateOfContact"></td>' +
-        '<td><input type="date" value="' + esc((lastReply(c) || {}).date) + '" data-cid="' + c.id + '" data-cfield="reply_last"></td>' +
+        '<td><input type="text" value="' + esc(formatDateShort(c.dateOfContact)) + '" placeholder="—" data-cid="' + c.id + '" data-cfield="dateOfContact"' + NO_ASSIST_ATTRS + "></td>" +
+        '<td><input type="text" value="' + esc(formatDateShort((lastReply(c) || {}).date)) + '" placeholder="—" data-cid="' + c.id + '" data-cfield="reply_last"' + NO_ASSIST_ATTRS + "></td>" +
         '<td class="linkedin-cell"><div class="linkedin-inner">' + linkedinOpen + '<input type="text" value="' + esc(c.linkedin) + '" placeholder="https://linkedin.com/in/…" data-cid="' + c.id + '" data-cfield="linkedin"' + NO_ASSIST_ATTRS + "></div></td>" +
         "</tr>";
     }).join("");
@@ -3633,6 +3633,8 @@
           escapeHtml(e.key) + '" data-cofield="' + col.key + '"' + NO_ASSIST_ATTRS + "></div>" };
       default:
         var text = col.type === "date" ? formatDateShort(v) : String(v);
+        // Empty dates show a dash (same as the job tables) so unfilled ones are easy to spot.
+        if (col.type === "date" && !text) return { cls: "cell-text", html: '<span style="color:var(--ink-faint);">—</span>' };
         return { cls: "cell-text", html: '<span title="' + escapeHtml(col.type === "text" ? v : text) + '">' + escapeHtml(text) + "</span>" };
     }
   }
@@ -4411,6 +4413,25 @@
     if (e.key === "Escape" && mergeModal.classList.contains("open")) closeMergeModal();
   });
 
+
+  // Contacts-table date cells behave like the job tables' date cells: month/day only at rest
+  // ("—" when empty so gaps stand out), a real date input (year included) while editing.
+  var CONTACT_DATE_FIELDS = ["dateOfContact", "reply_last"];
+  document.getElementById("tbody").addEventListener("focus", function (e) {
+    var f = e.target.getAttribute && e.target.getAttribute("data-cfield");
+    if (CONTACT_DATE_FIELDS.indexOf(f) === -1) return;
+    var c = findContact(e.target.getAttribute("data-cid"));
+    if (!c) return;
+    e.target.type = "date";
+    e.target.value = (f === "reply_last" ? (lastReply(c) || {}).date : c.dateOfContact) || "";
+    try { e.target.showPicker && e.target.showPicker(); } catch (err) { /* plain date input still works */ }
+  }, true);
+  document.getElementById("tbody").addEventListener("focusout", function (e) {
+    var f = e.target.getAttribute && e.target.getAttribute("data-cfield");
+    if (CONTACT_DATE_FIELDS.indexOf(f) === -1) return;
+    e.target.type = "text";
+    e.target.value = formatDateShort(e.target.value);
+  });
 
   // ---------- Replies ----------
   // A reply is a dated note (when a contact replied, and what they said), logged like a
