@@ -986,6 +986,7 @@
     </div>
     <div class="add-row" id="companies-add-row" style="display:none;">
       <button class="btn btn-primary" id="add-company" type="button">+ Add company</button>
+      <button class="btn" id="paste-btn-companies" type="button">+ Paste from bookmarklet</button>
       <span class="bookmarklet-hint">Companies from your jobs and contacts appear here on their own.</span>
     </div>
     <div class="add-row" id="contacts-add-row" style="display:none;">
@@ -1253,7 +1254,7 @@
 <div class="scrim" id="paste-scrim"></div>
 <div class="paste-modal" id="paste-modal" aria-hidden="true" role="dialog" aria-labelledby="paste-modal-title">
   <h2 id="paste-modal-title">Paste from bookmarklet</h2>
-  <p>Click "+ Add-job bookmarklet" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).</p>
+  <p id="paste-modal-help">Click "+ Add-job bookmarklet" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).</p>
   <textarea id="paste-textarea" rows="4" placeholder="Position: ...&#10;Company: ...&#10;Posting: ..."></textarea>
   <p id="paste-error" style="display:none; margin:8px 0 0; font-size:0.8rem; color:var(--danger);"></p>
   <div class="paste-modal-actions">
@@ -1907,7 +1908,15 @@
   var pasteTextarea = document.getElementById("paste-textarea");
   var pasteError = document.getElementById("paste-error");
 
-  function openPasteModal() {
+  // "job" (default) adds a job from the capture; "company" uses only its Company line to add
+  // a company (or open the one that already exists).
+  var pasteMode = "job";
+  function openPasteModal(mode) {
+    pasteMode = mode === "company" ? "company" : "job";
+    document.getElementById("paste-modal-help").textContent = pasteMode === "company"
+      ? "Click \"+ Add-job bookmarklet\" on a job posting or company page to copy it, then paste it here (Cmd/Ctrl+V). The Company name from it is used to add the company."
+      : "Click \"+ Add-job bookmarklet\" on the job posting's page to copy its details, then paste them here (Cmd/Ctrl+V).";
+    document.getElementById("paste-confirm").textContent = pasteMode === "company" ? "Add company" : "Add job";
     pasteTextarea.value = "";
     pasteError.style.display = "none";
     pasteScrim.classList.add("open");
@@ -1920,12 +1929,13 @@
     pasteModal.classList.remove("open");
     pasteModal.setAttribute("aria-hidden", "true");
   }
-  document.getElementById("paste-btn").addEventListener("click", openPasteModal);
+  document.getElementById("paste-btn").addEventListener("click", function () { openPasteModal("job"); });
   // Same trigger, duplicated on the Contacts tab's add-row — the tracker remembers
   // whichever tab was last open (even from a prior session) and can land you there
   // when the bookmarklet opens a fresh page, and Contacts' own add-row otherwise has
   // no way to reach the paste flow at all.
-  document.getElementById("paste-btn-contacts").addEventListener("click", openPasteModal);
+  document.getElementById("paste-btn-contacts").addEventListener("click", function () { openPasteModal("job"); });
+  document.getElementById("paste-btn-companies").addEventListener("click", function () { openPasteModal("company"); });
   document.getElementById("paste-cancel").addEventListener("click", closePasteModal);
   pasteScrim.addEventListener("click", closePasteModal);
   document.addEventListener("keydown", function (e) {
@@ -1933,6 +1943,19 @@
   });
   document.getElementById("paste-confirm").addEventListener("click", function () {
     var fields = parseBookmarkletClipboard(pasteTextarea.value);
+    if (pasteMode === "company") {
+      if (!fields.company) {
+        pasteError.textContent = fields.position || fields.postingUrl
+          ? "That capture has no company name. Add the company with \"+ Add company\" instead."
+          : "That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the page, copy again, then paste it here.";
+        pasteError.style.display = "block";
+        return;
+      }
+      pasteError.style.display = "none";
+      closePasteModal();
+      addCompanyByName(fields.company);
+      return;
+    }
     if (!fields.position && !fields.company && !fields.postingUrl) {
       pasteError.textContent = "That doesn't look like a bookmarklet capture. Click \"+ Add-job bookmarklet\" on the job posting's page, copy again, then paste it here.";
       pasteError.style.display = "block";
@@ -4158,8 +4181,14 @@
   async function confirmAddCompany() {
     var name = addcoInput.value.trim();
     if (!name) { addcoInput.focus(); return; }
-    var key = companyKey(name);
     closeAddCompany();
+    await addCompanyByName(name);
+  }
+  // Shared by "+ Add company" and "+ Paste from bookmarklet" on the Companies tab.
+  async function addCompanyByName(name) {
+    name = String(name || "").trim();
+    var key = companyKey(name);
+    if (!key) return;
     var existing = findCompanyEntry(key);
     if (existing) {
       // Same name means same company (they're matched by name), so continuing opens the
