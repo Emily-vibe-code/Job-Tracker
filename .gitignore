@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Personal data — never commit real job-search data.
+# "Export backup" in the app downloads files named like this.
+job-tracker-backup-*.json
+*.backup.json
+
+# Local scratch / editor / tooling
+*.bak
+*.log
+scratch/
+.vscode/
+.idea/
+.claude/
+tool-results/
+
+# Secrets, in case a backend is ever added
+.env
+.env.*
+
+# Node, in case tests or tooling are added later
+node_modules/
