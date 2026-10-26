@@ -87,4 +87,7 @@ Experiments and test files that were never published are not included.
 
 ## License
 
-No license has been chosen yet, so by default all rights are reserved.
+Copyright (c) 2026 Emily-vibe-code. All rights reserved.
+
+You're welcome to read the code and try the demo. Please don't copy, redistribute or reuse it
+without permission.
