@@ -43,18 +43,16 @@ browser's local storage. No install, no server, no account.
 |---|---|---|
 | ![Companies](docs/screenshots/companies.png) | ![Company slide-out](docs/screenshots/company.png) | ![Contacts](docs/screenshots/contacts.png) |
 
-## Running your own copy with cloud sync
+## How I run it
 
-[`src/job-tracker.html`](src/job-tracker.html) is the same app without sample data. Opened as a plain
-file it stores data in the browser only.
-
-I run it as a [Claude Artifact](https://claude.com), where it uses the artifact's `db` capability
-for live cloud sync across devices (and `downloads` for the backup export). Publish the file as an
-artifact with those two capabilities and it syncs automatically; if the capability isn't available
-it falls back to local storage.
+In daily use I run the same app as a private [Claude Artifact](https://claude.com), where it uses the
+artifact's `db` capability for live cloud sync across my devices (and `downloads` for the backup
+export). That copy holds my real search and is not part of this repo. The demo in this repo is the
+same app with fictional sample data. Opened as a plain file it stores data in the browser only, and
+the cloud code stays idle.
 
 The bookmarklet opens the tracker at one address, set by `TRACKER_URL` near the top of the
-bookmarklet section. Replace the placeholder with the link to your own published copy.
+bookmarklet section. In the demo that is a placeholder.
 
 ## Status and limits
 
