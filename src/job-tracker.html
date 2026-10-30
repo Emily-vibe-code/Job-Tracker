@@ -925,7 +925,9 @@
   #merge-modal { width: min(540px, 94vw); }
   #merge-scrim { z-index: 50; }
   .merge-field-label { display: block; font-size: 0.72rem; color: var(--ink-faint); font-weight: 500; margin: 12px 0 4px; }
-  #merge-list { max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; margin-top: 6px; background: var(--surface); }
+  #sr-scrim { z-index: 50; }
+  #sr-modal { width: min(520px, 94vw); }
+  #merge-list, #sr-list { max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; margin-top: 6px; background: var(--surface); }
   .merge-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.86rem; cursor: pointer; }
   .merge-row:last-child { border-bottom: none; }
   .merge-row:hover { background: var(--surface-alt); }
@@ -1224,6 +1226,17 @@
   </div>
 </aside>
 
+<div class="scrim" id="sr-scrim"></div>
+<div class="paste-modal" id="sr-modal" aria-hidden="true" role="alertdialog" aria-labelledby="sr-title">
+  <h2 id="sr-title">Items only on this device</h2>
+  <p id="sr-text"></p>
+  <div id="sr-list"></div>
+  <div class="paste-modal-actions">
+    <button type="button" id="sr-keep" class="btn">Keep and sync them</button>
+    <button type="button" id="sr-remove" class="btn btn-primary">Remove from this device</button>
+  </div>
+</div>
+
 <div class="scrim" id="merge-scrim"></div>
 <div class="paste-modal" id="merge-modal" aria-hidden="true" role="dialog" aria-labelledby="merge-title">
   <h2 id="merge-title">Merge companies</h2>
@@ -1496,6 +1509,75 @@
   // (local differs from base, so local wins).
   var syncedBase = {};          // "j:<id>" / "c:<id>" -> last-synced clone of the record
   var writeSeq = {};            // same keys -> bumps on every save, so a superseded write backs off
+
+  // ---------- Which records are known to be in the cloud ----------
+  // The merge never deletes a local record just because a snapshot lacks it (a lagging read
+  // would otherwise make fine records vanish), so a job deleted on another device or browser
+  // used to live on in this device's local copy and look like it had "come back". To tell
+  // "deleted elsewhere" from "created here and not synced yet", each device remembers the ids
+  // it has seen in (or written to) the cloud. A local record the cloud doesn't have is dropped
+  // if its id is in that list, and pushed up if it isn't. A device that predates this list gets a
+  // one-time prompt instead of a guess (see reconcileLocalOnly).
+  var SYNCED_KEY = "jobTrackerSyncedIds.v1";
+  var syncedLegacy = false;
+  var syncedIds = loadSyncedIds();
+  var syncedSaveTimer = null;
+  function loadSyncedIds() {
+    try {
+      var raw = localStorage.getItem(SYNCED_KEY);
+      if (raw) {
+        var p = JSON.parse(raw);
+        if (p && p.jobs && p.contacts && p.companies) return p;
+      }
+    } catch (e) { /* fall through to legacy */ }
+    syncedLegacy = true;
+    return { jobs: {}, contacts: {}, companies: {} };
+  }
+  function persistSyncedIds() {
+    if (syncedLegacy || syncedSaveTimer) return;
+    syncedSaveTimer = setTimeout(function () {
+      syncedSaveTimer = null;
+      try { localStorage.setItem(SYNCED_KEY, JSON.stringify(syncedIds)); } catch (e) { /* per-device only */ }
+    }, 300);
+  }
+  function markSynced(kind, id) { if (!syncedIds[kind][id]) { syncedIds[kind][id] = 1; persistSyncedIds(); } }
+  function unmarkSynced(kind, id) { if (syncedIds[kind][id]) { delete syncedIds[kind][id]; persistSyncedIds(); } }
+  var KEY_KIND = { j: "jobs", c: "contacts", k: "companies" };
+
+  // ---------- Deleted ids (so a late cloud update can't bring a deleted record back) ----------
+  // The merge adds any record a cloud update contains. An update that was already on its way
+  // when a record was deleted (or that the cloud hadn't yet seen the delete for) would put it
+  // straight back on screen — and, once edited or reloaded, back into the cloud. So each
+  // delete is remembered on this device for a while; updates for those ids that predate the
+  // delete are ignored, and the cloud delete is re-sent on load if the record is still there.
+  var TOMB_KEY = "jobTrackerDeleted.v1";
+  var TOMB_TTL = 30 * 24 * 3600 * 1000;
+  var tombstones = loadTombstones();
+  function loadTombstones() {
+    var t = { jobs: {}, contacts: {}, companies: {} };
+    try {
+      var raw = localStorage.getItem(TOMB_KEY);
+      if (raw) {
+        var p = JSON.parse(raw), now = Date.now();
+        Object.keys(t).forEach(function (k) {
+          Object.keys((p && p[k]) || {}).forEach(function (id) { if (now - p[k][id] < TOMB_TTL) t[k][id] = p[k][id]; });
+        });
+      }
+    } catch (e) { /* start empty */ }
+    return t;
+  }
+  function saveTombstones() { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tombstones)); } catch (e) { /* per-device only */ } }
+  function markDeleted(kind, id) { tombstones[kind][id] = Date.now(); saveTombstones(); }
+  // True when a cloud copy of this record is just the one we deleted (not edited since).
+  function isDeletedHere(kind, rec) {
+    var t = tombstones[kind][rec.id];
+    if (!t) return false;
+    if ((rec.updatedAt || 0) > t) { delete tombstones[kind][rec.id]; saveTombstones(); return false; }
+    return true;
+  }
+  // A delete must also cancel anything still queued or reading for that record, or a late
+  // write (e.g. a debounced edit flushed when the drawer closes) puts the record straight back.
+  function cancelWritesFor(prefix, id) { writeSeq[prefix + ":" + id] = (writeSeq[prefix + ":" + id] || 0) + 1; }
   function sameValue(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
   function isBlankValue(v) { return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length); }
   function mergeForWrite(local, remote, base) {
@@ -1525,6 +1607,7 @@
         var merged = remote ? mergeForWrite(body, JSON.parse(JSON.stringify(remote)), syncedBase[key]) : body;
         return col.doc(id).set(merged).then(function () {
           syncedBase[key] = JSON.parse(JSON.stringify(merged));
+          markSynced(KEY_KIND[key.charAt(0)], id);
           return merged;
         });
       });
@@ -1577,8 +1660,15 @@
   }
 
   function deleteFromDb(id) {
-    if (!jobsCol) return;
+    // Cancel anything queued for this job first — including a debounced write that closing the
+    // drawer would otherwise flush straight after the delete, bringing the job back.
     if (writeTimers[id]) { clearTimeout(writeTimers[id]); delete writeTimers[id]; }
+    delete pendingWrites[id];
+    cancelWritesFor("j", id);
+    delete syncedBase["j:" + id];
+    unmarkSynced("jobs", id);
+    markDeleted("jobs", id);
+    if (!jobsCol) return;
     jobsCol.doc(id).delete().catch(function () {
       setSyncStatus("off", "Sync paused — changes are saved on this device");
     });
@@ -1610,6 +1700,8 @@
     var byId = {};
     state.jobs.forEach(function (j) { byId[j.id] = j; });
     remoteJobs.forEach(function (rj) {
+      if (isDeletedHere("jobs", rj)) return;
+      markSynced("jobs", rj.id);
       var chosen = newerRecord(rj, byId[rj.id]);
       if (chosen === rj) syncedBase["j:" + rj.id] = JSON.parse(JSON.stringify(rj));
       byId[rj.id] = chosen;
@@ -1622,6 +1714,8 @@
     var byId = {};
     state.contacts.forEach(function (c) { byId[c.id] = c; });
     remoteContacts.forEach(function (rc) {
+      if (isDeletedHere("contacts", rc)) return;
+      markSynced("contacts", rc.id);
       var chosen = newerRecord(rc, byId[rc.id]);
       if (chosen === rc) syncedBase["c:" + rc.id] = JSON.parse(JSON.stringify(rc));
       byId[rc.id] = chosen;
@@ -1630,6 +1724,77 @@
     merged.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     state.contacts = merged;
   }
+
+
+  // Run once per page load, after the first full read of the cloud. Anything this device has
+  // that the cloud doesn't is either deleted-elsewhere (drop it), created-here-and-unsynced (push it),
+  // or, on a device with no history yet, unknown (ask once).
+  var srPending = null;
+  function reconcileLocalOnly(remoteIds) {
+    if (isSyncSensitive()) return;
+    var kinds = [
+      { kind: "jobs", list: function () { return state.jobs; }, setList: function (l) { state.jobs = l; localSave(); }, push: function (r) { save(r, true); },
+        label: function (r) { return (r.position || "Untitled job") + (r.company ? " at " + r.company : ""); } },
+      { kind: "contacts", list: function () { return state.contacts; }, setList: function (l) { state.contacts = l; localSaveContacts(); }, push: function (r) { saveContact(r, true); },
+        label: function (r) { return "Contact: " + (r.name || "Unnamed") + (r.company ? " (" + r.company + ")" : ""); } },
+      { kind: "companies", list: function () { return state.companies; }, setList: function (l) { state.companies = l; localSaveCompanies(); }, push: function (r) { saveCompany(r, true); },
+        label: function (r) { return "Company: " + (r.name || r.key); } }
+    ];
+    var review = [];
+    kinds.forEach(function (k) {
+      var ids = remoteIds[k.kind];
+      if (!ids) return; // not read (or empty) — nothing to compare against
+      var localOnly = k.list().filter(function (r) { return !ids[r.id]; });
+      if (!localOnly.length) return;
+      if (syncedLegacy) { localOnly.forEach(function (r) { review.push({ k: k, r: r }); }); return; }
+      var drop = {}, any = false;
+      localOnly.forEach(function (r) {
+        if (syncedIds[k.kind][r.id]) {
+          // A just-written record can briefly be missing from a read; only drop ones that have sat for a while.
+          if (Date.now() - (r.updatedAt || 0) > 120000) { drop[r.id] = true; any = true; unmarkSynced(k.kind, r.id); }
+        } else k.push(r);
+      });
+      if (any) k.setList(k.list().filter(function (r) { return !drop[r.id]; }));
+    });
+    if (!review.length) { finishReconcile(); renderTable(); return; }
+    srPending = review;
+    var el = document.getElementById("sr-list");
+    el.innerHTML = review.map(function (x) { return '<div class="merge-row"><span class="m-name">' + escapeHtml(x.k.label(x.r)) + "</span></div>"; }).join("");
+    document.getElementById("sr-text").textContent = review.length + (review.length === 1 ? " item is" : " items are") +
+      " on this device but not in your synced tracker. They were most likely deleted on another device or browser. Remove them from this device? Choose “Keep and sync” only if you created them here and want them in your tracker.";
+    document.getElementById("sr-scrim").classList.add("open");
+    var m = document.getElementById("sr-modal");
+    m.classList.add("open");
+    m.setAttribute("aria-hidden", "false");
+  }
+  function finishReconcile() {
+    // Every id the cloud returned (and every record just pushed) is already in syncedIds via
+    // markSynced; from here on this device keeps its list on disk.
+    syncedLegacy = false;
+    persistSyncedIds();
+  }
+  function resolveReview(keep) {
+    var review = srPending || [];
+    srPending = null;
+    document.getElementById("sr-scrim").classList.remove("open");
+    var m = document.getElementById("sr-modal");
+    m.classList.remove("open");
+    m.setAttribute("aria-hidden", "true");
+    var drops = { jobs: {}, contacts: {}, companies: {} };
+    review.forEach(function (x) { if (keep) x.k.push(x.r); else drops[x.k.kind][x.r.id] = true; });
+    if (!keep) {
+      [["jobs", function (l) { state.jobs = l; localSave(); }], ["contacts", function (l) { state.contacts = l; localSaveContacts(); }],
+        ["companies", function (l) { state.companies = l; localSaveCompanies(); }]].forEach(function (p) {
+        if (!Object.keys(drops[p[0]]).length) return;
+        var cur = p[0] === "jobs" ? state.jobs : p[0] === "contacts" ? state.contacts : state.companies;
+        p[1](cur.filter(function (r) { return !drops[p[0]][r.id]; }));
+      });
+    }
+    finishReconcile();
+    renderTable();
+  }
+  document.getElementById("sr-remove").addEventListener("click", function () { resolveReview(false); });
+  document.getElementById("sr-keep").addEventListener("click", function () { resolveReview(true); });
 
   async function initCloudSync() {
     if (!window.claude || typeof window.claude.use !== "function") {
@@ -1650,8 +1815,11 @@
     jobsCol = dbApi.collection("jobs");
     contactsCol = dbApi.collection("contacts");
     companiesCol = dbApi.collection("companies");
+    var remoteIds = {};
+    function idMap(qs) { var m = {}; qs.docs.forEach(function (d) { var data = d.data(); if (data && data.id) m[data.id] = true; }); return m; }
     try {
       var snap = await jobsCol.orderBy("createdAt").get();
+      if (!snap.empty) remoteIds.jobs = idMap(snap);
       // If a drawer is already open by the time this resolves (e.g. the viewer opened
       // a just-created job within the first moment of page load, before this fetch
       // landed), applying this snapshot could silently wipe that job out of state.jobs —
@@ -1668,6 +1836,7 @@
 
     try {
       var cSnap = await contactsCol.orderBy("createdAt").get();
+      if (!cSnap.empty) remoteIds.contacts = idMap(cSnap);
       if (!cSnap.empty && !isSyncSensitive()) {
         mergeContactsFromSnapshot(cSnap.docs.map(function (d) { return normalizeContact(d.data()); }));
         localSaveContacts();
@@ -1678,6 +1847,7 @@
     } catch (e) { /* keep whatever loaded from localStorage */ }
     try {
       var coSnap = await companiesCol.orderBy("createdAt").get();
+      if (!coSnap.empty) remoteIds.companies = idMap(coSnap);
       if (!coSnap.empty && !isSyncSensitive()) {
         mergeCompaniesFromSnapshot(coSnap.docs.map(function (d) { return normalizeCompany(d.data()); }));
         localSaveCompanies();
@@ -1686,6 +1856,24 @@
         state.companies.forEach(function (c) { saveCompany(c, true); });
       }
     } catch (e) { /* keep whatever loaded from localStorage */ }
+    [["jobs", jobsCol], ["contacts", contactsCol], ["companies", companiesCol]].forEach(function (p) {
+      Object.keys(tombstones[p[0]]).forEach(function (id) {
+        if (remoteIds[p[0]] && remoteIds[p[0]][id]) {
+          delete remoteIds[p[0]][id];
+          p[1].doc(id).delete().catch(function () { /* tried again next load */ });
+        }
+      });
+    });
+    // A copy of something deleted here that is still lying around in this device's local data goes too.
+    var droppedLocal = false;
+    [["jobs", function () { return state.jobs; }, function (l) { state.jobs = l; localSave(); }],
+      ["contacts", function () { return state.contacts; }, function (l) { state.contacts = l; localSaveContacts(); }],
+      ["companies", function () { return state.companies; }, function (l) { state.companies = l; localSaveCompanies(); }]].forEach(function (p) {
+      var keep = p[1]().filter(function (r) { return !tombstones[p[0]][r.id] || (r.updatedAt || 0) > tombstones[p[0]][r.id]; });
+      if (keep.length !== p[1]().length) { p[2](keep); droppedLocal = true; }
+    });
+    if (droppedLocal) renderTable();
+    reconcileLocalOnly(remoteIds);
     migrateEmbeddedContacts();
     migrateContactFields();
     migrateValuesNotes();
@@ -2066,8 +2254,13 @@
   }
 
   function deleteContactFromDb(id) {
-    if (!contactsCol) return;
     if (contactWriteTimers[id]) { clearTimeout(contactWriteTimers[id]); delete contactWriteTimers[id]; }
+    delete pendingContactWrites[id];
+    cancelWritesFor("c", id);
+    delete syncedBase["c:" + id];
+    unmarkSynced("contacts", id);
+    markDeleted("contacts", id);
+    if (!contactsCol) return;
     contactsCol.doc(id).delete().catch(function () { /* local copy still removed either way */ });
   }
 
@@ -2225,6 +2418,8 @@
     var byId = {};
     state.companies.forEach(function (c) { byId[c.id] = c; });
     remote.forEach(function (rc) {
+      if (isDeletedHere("companies", rc)) return;
+      markSynced("companies", rc.id);
       var chosen = newerRecord(rc, byId[rc.id]);
       if (chosen === rc) syncedBase["k:" + rc.id] = JSON.parse(JSON.stringify(rc));
       byId[rc.id] = chosen;
@@ -4207,6 +4402,10 @@
   }
   function deleteCompanyFromDb(id) {
     if (companyWriteTimers[id]) { clearTimeout(companyWriteTimers[id]); delete companyWriteTimers[id]; delete pendingCompanyWrites[id]; }
+    cancelWritesFor("k", id);
+    delete syncedBase["k:" + id];
+    unmarkSynced("companies", id);
+    markDeleted("companies", id);
     if (!companiesCol) return;
     companiesCol.doc(id).delete().catch(function () { /* local copy is already gone */ });
   }
